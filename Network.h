@@ -3,6 +3,7 @@
 #include "Dropout.h"
 #include "Residual.h"
 #include "Conv1d.h"
+#include "Softmax.h"
 #include <vector>
 #include <random>
 
@@ -40,6 +41,7 @@ public:
     void addDropout  (double p = 0.2);
     void addResidual (int n, Activation act, int skipFromIdx);
     void addConv1D   (int kernelSize, Activation act);
+    void addSoftmax();
 
     // ── PyTorch-style interface ───────────────────────────
     std::vector<double> forward  (const std::vector<double>& inputs,

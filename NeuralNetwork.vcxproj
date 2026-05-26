@@ -31,6 +31,7 @@
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="Neuron.cpp" />
     <ClCompile Include="Residual.cpp" />
+    <ClCompile Include="Softmax.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Activation.h" />
@@ -44,6 +45,7 @@
     <ClInclude Include="Network.h" />
     <ClInclude Include="Neuron.h" />
     <ClInclude Include="Residual.h" />
+    <ClInclude Include="Softmax.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

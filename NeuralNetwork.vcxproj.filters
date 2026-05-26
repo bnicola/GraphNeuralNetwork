@@ -51,6 +51,9 @@
     <ClCompile Include="Conv1d.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Softmax.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Activation.h">
@@ -84,6 +87,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Conv1d.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Softmax.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

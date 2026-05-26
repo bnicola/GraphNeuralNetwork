@@ -90,6 +90,35 @@ void Network::addResidual(int n, Activation act, int skipFromIdx)
 }
 
 // =============================================================
+//  addSoftmax
+//  Creates a softmax layer and wires with previous layer 
+//  automatically.
+// =============================================================
+void Network::addSoftmax()
+{
+  assert(!layers_.empty() && "add an input layer first");
+
+  int idx           = (int)layers_.size();
+  int prevLayerSize = layers_.back()->size();
+  Layer* layer      = new Softmax(idx, prevLayerSize);
+  layers_.push_back(layer);
+
+  Layer* prev = layers_[layers_.size() - 2];
+  for (int i = 0; i < prevLayerSize; i++)
+  {
+    Connection* c = new Connection();
+    c->from       = prev->neurons_[i];
+    c->to         = layer->neurons_[i];
+    c->trainable  = false;
+    c->weight     = 1.0;
+
+    prev->neurons_[i]->outConns.push_back(c);
+    layer->neurons_[i]->inConns.push_back(c);
+    allConns_.push_back(c);
+  }
+}
+
+// =============================================================
 //  forward
 //  Propagates inputs left to right through all layers.
 //  Dropout uses forwardWithMask(); all others use forward().

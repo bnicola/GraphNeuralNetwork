@@ -1,0 +1,11 @@
+# Visual Studio temp files
+.vs/
+
+# Build output
+x64/
+
+# Your generated model file
+xor.model
+
+# Local folder you don't want tracked
+NeuralNetwork/

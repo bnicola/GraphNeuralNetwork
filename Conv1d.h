@@ -49,7 +49,7 @@ public:
     // act        = activation applied after convolution
     // initStd    = weight init standard deviation
     Conv1DLayer(int index, int prevSize, int kernelSize,
-                Activation act, double initStd);
+                int stride, Activation act, double initStd);
 
     ~Conv1DLayer();
 
@@ -60,11 +60,14 @@ public:
 
     std::string typeName() const override { return "Conv1D"; }
     int         kernelSize()    const     { return filter_->size(); }
-
+    int         stride() const { return stride_; }
     // the shared filter — accessed by Network::wireConv1D()
     Filter* filter_;
 
 private:
-    // output count = prevSize - kernelSize + 1
-    static int outputSize(int prevSize, int kernelSize);
+  // output count = (prevSize - kernelSize)/stride + 1
+  static int outputSize(int prevSize, int kernelSize, int stride);
+
+private:
+    int stride_;
 };

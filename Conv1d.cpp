@@ -2,13 +2,13 @@
 #include <cassert>
 #include <cmath>
 
-Conv1DLayer::Conv1DLayer(int idx, int prevSize, int kernelSize, Activation a, double initStd)
+Conv1DLayer::Conv1DLayer(int idx, int prevSize, int kernelSize, int stride, Activation a, double initStd)
   : Layer(idx, a),
   filter_(new Filter(kernelSize, initStd))
 {
   assert(prevSize > kernelSize && "Conv1D: kernel larger than input");
 
-  int n = outputSize(prevSize, kernelSize);
+  int n = outputSize(prevSize, kernelSize, stride);
   createNeurons(n, "L"+std::to_string(idx)+"-C");
 }
 
@@ -17,9 +17,9 @@ Conv1DLayer::~Conv1DLayer()
   delete filter_;
 }
 
-int Conv1DLayer::outputSize(int prevSize, int kernelSize)
+int Conv1DLayer::outputSize(int prevSize, int kernelSize, int stride)
 {
-  return prevSize - kernelSize + 1;
+  return (prevSize - kernelSize) / stride + 1;
 }
 
 // =============================================================

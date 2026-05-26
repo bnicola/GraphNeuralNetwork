@@ -6,7 +6,6 @@ Softmax::Softmax(int idx, int numNeurons)
   createNeurons(numNeurons, "L"+std::to_string(idx)+"-S");
 }
 
-
 void Softmax::forward()
 {
   // Step 1 — compute z = Σ w*x + bias  for each neuron

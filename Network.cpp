@@ -363,14 +363,14 @@ void Network::wireDense(Layer* prev, Layer* curr)
 //
 //  initStd uses sqrt(1/kernelSize) — a common conv init.
 // =============================================================
-void Network::addConv1D(int kernelSize, Activation act)
+void Network::addConv1D(int kernelSize, Activation act, int stride)
 {
   assert(!layers_.empty() && "add an input layer first");
   int    idx      = (int)layers_.size();
   int    prevSize = layers_.back()->size();
   double initStd  = std::sqrt(1.0 / kernelSize);
 
-  auto* layer = new Conv1DLayer(idx, prevSize, kernelSize, act, initStd);
+  auto* layer = new Conv1DLayer(idx, prevSize, kernelSize, stride, act, initStd);
   layers_.push_back(layer);
 
   wireConv1D(layers_[layers_.size()-2], layer);
@@ -405,10 +405,11 @@ void Network::wireConv1D(Layer* prev, Conv1DLayer* curr)
   {
     Neuron* dst = curr->neurons_[i];
 
+    int stride = curr->stride();
     for (int k = 0; k < K; k++) 
     {
       // input neuron at position i+k feeds into output neuron i
-      Neuron* src = prev->neurons_[i + k];
+      Neuron* src = prev->neurons_[(i * stride) + k];
 
       auto* c        = new Connection();
       c->from        = src;

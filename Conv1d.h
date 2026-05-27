@@ -44,30 +44,28 @@
 class Conv1DLayer : public Layer
 {
 public:
-    // prevSize   = number of neurons in previous layer
-    // kernelSize = K, the filter width
-    // act        = activation applied after convolution
-    // initStd    = weight init standard deviation
-    Conv1DLayer(int index, int prevSize, int kernelSize,
-                int stride, Activation act, double initStd);
+  // prevSize   = number of neurons in previous layer
+  // kernelSize = K, the filter width
+  // act        = activation applied after convolution
+  // initStd    = weight init standard deviation
+  Conv1DLayer(int index, int prevSize, int kernelSize,
+    int stride, Activation act, double initStd);
+	
+  ~Conv1DLayer();
 
-    ~Conv1DLayer();
+  void forward() override;
+  void backward() override;
+  void step(double lr, int t) override;
+  void zero_grad() override;
 
-    void forward()              override;
-    void backward()             override;
-    void step(double lr, int t) override;
-    void zero_grad()            override;
+  std::string typeName() const override { return "Conv1D"; }
+  int kernelSize() const { return kernelSize_; }
+  int stride() const { return stride_; }
 
-    std::string typeName() const override { return "Conv1D"; }
-    int         kernelSize()    const     { return filter_->size(); }
-    int         stride() const { return stride_; }
-    // the shared filter — accessed by Network::wireConv1D()
-    Filter* filter_;
+  Filter* filter_;
 
 private:
-  // output count = (prevSize - kernelSize)/stride + 1
+  int kernelSize_;
+  int stride_;
   static int outputSize(int prevSize, int kernelSize, int stride);
-
-private:
-    int stride_;
 };

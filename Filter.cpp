@@ -26,11 +26,16 @@ Filter::Filter(int kernelSize, double initStd)
 //  Applies one Adam update per weight slot.
 //  This is the key point — one update, not N updates.
 // =============================================================
-void Filter::step(double lr, int t)
+void Filter::step(double lr, int t, int contributions)
 {
   for (int k = 0; k < kernelSize_; k++)
   {
-    adam_[k].update(weights_[k], gradients_[k], lr, t);
+    double avgGrad = gradients_[k] / contributions;
+
+    // === GRADIENT CLIPPING - Very Important for Conv ===
+    avgGrad = std::max(-5.0, std::min(5.0, avgGrad));   // clip to [-5, 5]
+
+    adam_[k].update(weights_[k], avgGrad, lr, t);
   }
 }
 

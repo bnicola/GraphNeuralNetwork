@@ -1,15 +1,17 @@
 #include "Conv1d.h"
 #include <cassert>
-#include <cmath>
 
-Conv1DLayer::Conv1DLayer(int idx, int prevSize, int kernelSize, int stride, Activation a, double initStd)
-  : Layer(idx, a),
-  filter_(new Filter(kernelSize, initStd))
+Conv1DLayer::Conv1DLayer(int index, int prevSize, int kernelSize,
+  int stride, Activation act, double initStd)
+  : Layer(index, act)
+  , kernelSize_(kernelSize)
+  , stride_(stride)
+  , filter_(new Filter(kernelSize, initStd))
 {
-  assert(prevSize > kernelSize && "Conv1D: kernel larger than input");
-
+  assert(stride >= 1);
   int n = outputSize(prevSize, kernelSize, stride);
-  createNeurons(n, "L"+std::to_string(idx)+"-C");
+  assert(n > 0);
+  createNeurons(n, "L" + std::to_string(index) + "-C");
 }
 
 Conv1DLayer::~Conv1DLayer()
@@ -60,12 +62,17 @@ void Conv1DLayer::backward()
 // =============================================================
 void Conv1DLayer::step(double lr, int t)
 {
+  // Each output neuron contributes to the same filter weights.
+  // We must average the gradients across all output neurons.
+  int numContributions = size();   // number of output neurons
+
   for (auto* n : neurons_)
   {
     n->step(lr, t);     // updates bias only (conv conns skipped)
   }
 
-  filter_->step(lr, t);   // updates K shared filter weights once
+  // Update shared filter weights with averaged gradient
+  filter_->step(lr, t, (int)neurons_.size());
 }
 
 // =============================================================
@@ -85,4 +92,5 @@ void Conv1DLayer::zero_grad()
     n->zero_grad();
   }
   filter_->zero_grad();   // clear accumulated gradients in filter
+  
 }

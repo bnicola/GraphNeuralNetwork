@@ -55,7 +55,7 @@ public:
     Filter(int kernelSize, double initStd);
 
     // apply one Adam step to each weight slot
-    void step(double lr, int t);
+    void step(double lr, int t, int contributions);
 
     // clear all gradient accumulators before next sample
     void zero_grad();

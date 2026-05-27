@@ -15,16 +15,14 @@ int main()
 
   Network net(42);
 
-  net.addLinear(7, Activation::LINEAR); // input
-  net.addLinear(8, Activation::TANH);   
+  net.addLinear(7,   Activation::LINEAR); // input
+  net.addLinear(120, Activation::LEAKY_RELU);   
   net.addDropout(0.5);
-  net.addConv1D(3, Activation::TANH, 1, 15);
-  net.addLinear(2, Activation::LINEAR);
-  /*net.addResidual(8, Activation::TANH, 1);
-  net.addConv1D(4, Activation::TANH, 2);
-  net.addLinear(2, Activation::LINEAR);
-  net.addLinear(8, Activation::TANH);
-  net.addLinear(2, Activation::LINEAR);*/
+  net.addResidual(7, Activation::RELU, 0);
+  net.addConv1D(3,   Activation::LEAKY_RELU, 1, 5);
+  net.addResidual(7, Activation::TANH, 3);
+  net.addDropout(0.5);
+  net.addLinear(2,   Activation::LINEAR);
   net.addSoftmax();
 
   net.summary();

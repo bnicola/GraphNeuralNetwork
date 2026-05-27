@@ -23,7 +23,8 @@ Conv1DLayer::Conv1DLayer(int index, int prevSize, int kernelSize,
 
 Conv1DLayer::~Conv1DLayer()
 {
-  //delete[] filter_;
+  for (auto* f : filters_)
+    delete f;
 }
 
 int Conv1DLayer::outputSize(int prevSize, int kernelSize, int stride)

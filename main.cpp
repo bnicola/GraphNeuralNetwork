@@ -17,12 +17,14 @@ int main()
 
   net.addLinear(7, Activation::LINEAR); // input
   net.addLinear(8, Activation::TANH);   
-  net.addConv1D(3, Activation::TANH, 2);
+  net.addDropout(0.5);
+  net.addConv1D(3, Activation::TANH, 1, 15);
   net.addLinear(2, Activation::LINEAR);
-  net.addResidual(8, Activation::TANH, 1);
+  /*net.addResidual(8, Activation::TANH, 1);
+  net.addConv1D(4, Activation::TANH, 2);
   net.addLinear(2, Activation::LINEAR);
   net.addLinear(8, Activation::TANH);
-  net.addLinear(2, Activation::LINEAR);
+  net.addLinear(2, Activation::LINEAR);*/
   net.addSoftmax();
 
   net.summary();

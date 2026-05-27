@@ -49,7 +49,7 @@ public:
   // act        = activation applied after convolution
   // initStd    = weight init standard deviation
   Conv1DLayer(int index, int prevSize, int kernelSize,
-    int stride, Activation act, double initStd);
+              int stride, int numFilters, Activation act, double initStd);
 	
   ~Conv1DLayer();
 
@@ -62,10 +62,11 @@ public:
   int kernelSize() const { return kernelSize_; }
   int stride() const { return stride_; }
 
-  Filter* filter_;
+  std::vector<Filter*> filters_;
 
 private:
   int kernelSize_;
   int stride_;
+  int numFilters_;
   static int outputSize(int prevSize, int kernelSize, int stride);
 };

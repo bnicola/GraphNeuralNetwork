@@ -40,7 +40,7 @@ public:
     void addLinear   (int n, Activation act);
     void addDropout  (double p = 0.2);
     void addResidual (int n, Activation act, int skipFromIdx);
-    void addConv1D   (int kernelSize, Activation act, int stride = 1);
+    void addConv1D   (int kernelSize, Activation act, int stride = 1, int numFilters = 1);
     void addSoftmax();
 
     // ── PyTorch-style interface ───────────────────────────
@@ -76,7 +76,7 @@ private:
     // wiring helpers
     void wireDense   (Layer* prev, Layer* curr);
     void wireSkip    (Layer* src,  Layer* dst);
-    void wireConv1D  (Layer* prev, Conv1DLayer* curr);
+    void wireConv1D  (Layer* prev, Conv1DLayer* curr, int numFilters);
 
     std::vector<double> getOutputs() const;
     double              xavier     (int fanIn, int fanOut) const;

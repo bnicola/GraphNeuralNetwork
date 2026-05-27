@@ -363,17 +363,17 @@ void Network::wireDense(Layer* prev, Layer* curr)
 //
 //  initStd uses sqrt(1/kernelSize) — a common conv init.
 // =============================================================
-void Network::addConv1D(int kernelSize, Activation act, int stride)
+void Network::addConv1D(int kernelSize, Activation act, int stride, int numFilters)
 {
   assert(!layers_.empty() && "add an input layer first");
   int    idx      = (int)layers_.size();
   int    prevSize = layers_.back()->size();
   double initStd  = std::sqrt(1.0 / kernelSize);
 
-  auto* layer = new Conv1DLayer(idx, prevSize, kernelSize, stride, act, initStd);
+  auto* layer = new Conv1DLayer(idx, prevSize, kernelSize, stride, numFilters, act, initStd);
   layers_.push_back(layer);
 
-  wireConv1D(layers_[layers_.size()-2], layer);
+  wireConv1D(layers_[layers_.size()-2], layer, numFilters);
 }
 
 // =============================================================
@@ -397,32 +397,36 @@ void Network::addConv1D(int kernelSize, Activation act, int stride)
 //  Neuron::forward()  reads  filter->weight(k) for each conn.
 //  Neuron::backward() calls  filter->accumulateGrad(k, grad).
 // =============================================================
-void Network::wireConv1D(Layer* prev, Conv1DLayer* curr)
+void Network::wireConv1D(Layer* prev, Conv1DLayer* curr, int numFilters)
 {
   int K = curr->kernelSize();
-
-  for (int i = 0; i < curr->size(); i++) 
+  // curr->size() gives the total number of neueons.
+  int outputSize = curr->size() / numFilters;
+  for (int f = 0; f < numFilters; f++)
   {
-    Neuron* dst = curr->neurons_[i];
-
-    int stride = curr->stride();
-    for (int k = 0; k < K; k++) 
+    for (int i = 0; i < (outputSize); i++)
     {
-      // input neuron at position i+k feeds into output neuron i
-      Neuron* src = prev->neurons_[(i * stride) + k];
+      Neuron* dst = curr->neurons_[f * outputSize + i];
 
-      auto* c        = new Connection();
-      c->from        = src;
-      c->to          = dst;
-      c->filter      = curr->filter_;   // shared filter
-      c->filterSlot  = k;               // which weight slot
-      c->trainable   = true;
-      // c->weight not used — weight lives in filter
-      //            // c->gradient not used — grad goes to filter->accumulateGrad
+      int stride = curr->stride();
+      for (int k = 0; k < K; k++)
+      {
+        // input neuron at position i+k feeds into output neuron i
+        Neuron* src = prev->neurons_[(i * stride) + k];
 
-      src->outConns.push_back(c);
-      dst->inConns.push_back(c);
-      allConns_.push_back(c);
+        auto* c = new Connection();
+        c->from = src;
+        c->to = dst;
+        c->filter = curr->filters_[f];   // shared filters
+        c->filterSlot = k;               // which weight slot
+        c->trainable = true;
+        // c->weight not used — weight lives in filter
+        // c->gradient not used — grad goes to filter->accumulateGrad
+
+        src->outConns.push_back(c);
+        dst->inConns.push_back(c);
+        allConns_.push_back(c);
+      }
     }
   }
 }

@@ -2,21 +2,28 @@
 #include <cassert>
 
 Conv1DLayer::Conv1DLayer(int index, int prevSize, int kernelSize,
-  int stride, Activation act, double initStd)
+  int stride, int numFilters, Activation act, double initStd)
   : Layer(index, act)
   , kernelSize_(kernelSize)
   , stride_(stride)
-  , filter_(new Filter(kernelSize, initStd))
+  , numFilters_(numFilters)
 {
   assert(stride >= 1);
+  // Create the number of filter (for different 
+  // features to be captred).
+  for (int f = 0; f < numFilters; f++)
+  {
+    filters_.push_back(new Filter(kernelSize, initStd));
+  }
   int n = outputSize(prevSize, kernelSize, stride);
   assert(n > 0);
-  createNeurons(n, "L" + std::to_string(index) + "-C");
+  int totalNeurons = numFilters * outputSize(prevSize, kernelSize, stride);
+  createNeurons(totalNeurons, "L" + std::to_string(index) + "-C");
 }
 
 Conv1DLayer::~Conv1DLayer()
 {
-  delete filter_;
+  //delete[] filter_;
 }
 
 int Conv1DLayer::outputSize(int prevSize, int kernelSize, int stride)
@@ -72,7 +79,10 @@ void Conv1DLayer::step(double lr, int t)
   }
 
   // Update shared filter weights with averaged gradient
-  filter_->step(lr, t, (int)neurons_.size());
+  for (auto* f : filters_)
+  {
+    f->step(lr, t, (int)neurons_.size());
+  }
 }
 
 // =============================================================
@@ -91,6 +101,9 @@ void Conv1DLayer::zero_grad()
   {
     n->zero_grad();
   }
-  filter_->zero_grad();   // clear accumulated gradients in filter
+  for (int i = 0; i < numFilters_; i++)
+  {
+    filters_.at(i)->zero_grad();   // clear accumulated gradients in filter
+  }
   
 }

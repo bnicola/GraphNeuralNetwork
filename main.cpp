@@ -19,7 +19,7 @@ int main()
   net.addLinear(120, Activation::LEAKY_RELU);   
   net.addDropout(0.5);
   net.addResidual(7, Activation::RELU, 0);
-  net.addConv1D(3,   Activation::LEAKY_RELU, 1, 5);
+  net.addConv1D(3,   Activation::LEAKY_RELU, 1, 25);
   net.addResidual(7, Activation::TANH, 3);
   net.addDropout(0.5);
   net.addLinear(2,   Activation::LINEAR);

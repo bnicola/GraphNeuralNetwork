@@ -430,6 +430,7 @@ void Network::wireConv1D(Layer* prev, Conv1DLayer* curr, int numFilters)
     }
   }
 }
+
 //  Creates a normal Connection from src neuron i to dst neuron i
 //  with weight=1.0 and trainable=false.
 //

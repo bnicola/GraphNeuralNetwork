@@ -119,6 +119,160 @@ void Network::addSoftmax()
 }
 
 // =============================================================
+//  addConv1D
+//
+//  Creates a Conv1DLayer and wires it to the previous layer.
+//
+//  Output size = prevSize - kernelSize + 1
+//  Each output neuron i gets K connections from input[i..i+K-1]
+//  all pointing to the same Filter, each with its filterSlot.
+//
+//  initStd uses sqrt(1/kernelSize) — a common conv init.
+// =============================================================
+void Network::addConv1D(int kernelSize, Activation act, int stride, int numFilters)
+{
+  assert(!layers_.empty() && "add an input layer first");
+  int    idx = (int)layers_.size();
+  int    prevSize = layers_.back()->size();
+  double initStd = std::sqrt(1.0 / kernelSize);
+
+  auto* layer = new Conv1DLayer(idx, prevSize, kernelSize, stride, numFilters, act, initStd);
+  layers_.push_back(layer);
+
+  wireConv1D(layers_[layers_.size() - 2], layer, numFilters);
+}
+
+// =============================================================
+//  wireConv1D  (private)
+//
+//  This is the key wiring that makes Conv different from Dense.
+//
+//  For each output neuron i (0 .. outputSize-1):
+//    For each filter slot k (0 .. K-1):
+//      Create a Connection from input[i+k] → output[i]
+//      Set c->filter     = layer's Filter (shared)
+//      Set c->filterSlot = k
+//
+//  So output neuron 0 connects to input[0,1,2] with slots [0,1,2]
+//     output neuron 1 connects to input[1,2,3] with slots [0,1,2]
+//     output neuron 2 connects to input[2,3,4] with slots [0,1,2]
+//
+//  The same filter slot k is used by ALL output neurons for
+//  their k-th connection. That is weight sharing.
+//
+//  Neuron::forward()  reads  filter->weight(k) for each conn.
+//  Neuron::backward() calls  filter->accumulateGrad(k, grad).
+// =============================================================
+void Network::wireConv1D(Layer* prev, Conv1DLayer* curr, int numFilters)
+{
+  int K = curr->kernelSize();
+  // curr->size() gives the total number of neueons.
+  int outputSize = curr->size() / numFilters;
+  for (int f = 0; f < numFilters; f++)
+  {
+    for (int i = 0; i < (outputSize); i++)
+    {
+      Neuron* dst = curr->neurons_[f * outputSize + i];
+
+      int stride = curr->stride();
+      for (int k = 0; k < K; k++)
+      {
+        // input neuron at position i+k feeds into output neuron i
+        Neuron* src = prev->neurons_[(i * stride) + k];
+
+        auto* c = new Connection();
+        c->from = src;
+        c->to = dst;
+        c->filter = curr->filters_[f];   // shared filters
+        c->filterSlot = k;               // which weight slot
+        c->trainable = true;
+        // c->weight not used — weight lives in filter
+        // c->gradient not used — grad goes to filter->accumulateGrad
+
+        src->outConns.push_back(c);
+        dst->inConns.push_back(c);
+        allConns_.push_back(c);
+      }
+    }
+  }
+}
+
+// =============================================================
+// addConv2D
+// =============================================================
+void Network::addConv2D(int inputHeight, int inputWidth,
+  int kernelHeight, int kernelWidth,
+  int strideH, int strideW,
+  int numFilters,
+  Activation act,
+  double initStd)
+{
+  assert(!layers_.empty() && "add an input layer first");
+
+  int idx = (int)layers_.size();
+  auto* layer = new Conv2DLayer(idx, inputHeight, inputWidth, kernelHeight, kernelWidth, strideH, strideW, numFilters, act, initStd);
+  layers_.push_back(layer);
+
+  wireConv2D(layers_[layers_.size() - 2], layer);
+}
+
+// =============================================================
+// wireConv2D
+// =============================================================
+void Network::wireConv2D(Layer* prev, Conv2DLayer* curr)
+{
+  int inH = curr->inputHeight();
+  int inW = curr->inputWidth();
+  int kH = curr->kernelHeight();
+  int kW = curr->kernelWidth();
+  int sH = curr->strideH();
+  int sW = curr->strideW();
+  int numFilters = curr->numFilters();
+  int outH = curr->outputHeight();
+  int outW = curr->outputWidth();
+
+  int neuronsPerFilter = outH * outW;
+
+  for (int f = 0; f < numFilters; f++)
+  {
+    for (int oh = 0; oh < outH; oh++)
+    {
+      for (int ow = 0; ow < outW; ow++)
+      {
+        int dstIdx = (f * neuronsPerFilter) + oh * outW + ow;
+        Neuron* dst = curr->neurons_[dstIdx];
+
+        for (int kh = 0; kh < kH; kh++)
+        {
+          for (int kw = 0; kw < kW; kw++)
+          {
+            int srcH = oh * sH + kh;
+            int srcW = ow * sW + kw;
+
+            if (srcH >= inH || srcW >= inW)
+              continue;
+
+            int srcIdx = srcH * inW + srcW;
+            Neuron* src = prev->neurons_[srcIdx];
+
+            auto* c = new Connection();
+            c->from = src;
+            c->to = dst;
+            c->filter = curr->filters_[f];
+            c->filterSlot = kh * kW + kw;
+            c->trainable = true;
+
+            src->outConns.push_back(c);
+            dst->inConns.push_back(c);
+            allConns_.push_back(c);
+          }
+        }
+      }
+    }
+  }
+}
+
+// =============================================================
 //  forward
 //  Propagates inputs left to right through all layers.
 //  Dropout uses forwardWithMask(); all others use forward().
@@ -274,7 +428,6 @@ double Network::train(const std::vector<std::vector<double>>& inputs, const std:
   return loss / N;
 }
 
-
 // =============================================================
 //  predict
 //  Forward pass with no dropout (isTraining=false).
@@ -316,6 +469,11 @@ void Network::summary() const
       notes = "kernel=" + std::to_string(cl->kernelSize())
         + "  params=" + std::to_string(cl->kernelSize());
     }
+    if (auto* cl = dynamic_cast<Conv2DLayer*>(l))
+    {
+      notes = "kernelHeight = " + std::to_string(cl->kernelHeight()) + ", kernelWidth = " + std::to_string(cl->kernelWidth())
+        + "  filters=" + std::to_string(cl->numFilters());
+    }
 
     std::cout << std::setw(6)  << ("L"+std::to_string(l->index))
       << std::setw(12) << l->typeName()
@@ -348,85 +506,6 @@ void Network::wireDense(Layer* prev, Layer* curr)
       src->outConns.push_back(c);
       dst->inConns.push_back(c);
       allConns_.push_back(c);
-    }
-  }
-}
-
-// =============================================================
-//  addConv1D
-//
-//  Creates a Conv1DLayer and wires it to the previous layer.
-//
-//  Output size = prevSize - kernelSize + 1
-//  Each output neuron i gets K connections from input[i..i+K-1]
-//  all pointing to the same Filter, each with its filterSlot.
-//
-//  initStd uses sqrt(1/kernelSize) — a common conv init.
-// =============================================================
-void Network::addConv1D(int kernelSize, Activation act, int stride, int numFilters)
-{
-  assert(!layers_.empty() && "add an input layer first");
-  int    idx      = (int)layers_.size();
-  int    prevSize = layers_.back()->size();
-  double initStd  = std::sqrt(1.0 / kernelSize);
-
-  auto* layer = new Conv1DLayer(idx, prevSize, kernelSize, stride, numFilters, act, initStd);
-  layers_.push_back(layer);
-
-  wireConv1D(layers_[layers_.size()-2], layer, numFilters);
-}
-
-// =============================================================
-//  wireConv1D  (private)
-//
-//  This is the key wiring that makes Conv different from Dense.
-//
-//  For each output neuron i (0 .. outputSize-1):
-//    For each filter slot k (0 .. K-1):
-//      Create a Connection from input[i+k] → output[i]
-//      Set c->filter     = layer's Filter (shared)
-//      Set c->filterSlot = k
-//
-//  So output neuron 0 connects to input[0,1,2] with slots [0,1,2]
-//     output neuron 1 connects to input[1,2,3] with slots [0,1,2]
-//     output neuron 2 connects to input[2,3,4] with slots [0,1,2]
-//
-//  The same filter slot k is used by ALL output neurons for
-//  their k-th connection. That is weight sharing.
-//
-//  Neuron::forward()  reads  filter->weight(k) for each conn.
-//  Neuron::backward() calls  filter->accumulateGrad(k, grad).
-// =============================================================
-void Network::wireConv1D(Layer* prev, Conv1DLayer* curr, int numFilters)
-{
-  int K = curr->kernelSize();
-  // curr->size() gives the total number of neueons.
-  int outputSize = curr->size() / numFilters;
-  for (int f = 0; f < numFilters; f++)
-  {
-    for (int i = 0; i < (outputSize); i++)
-    {
-      Neuron* dst = curr->neurons_[f * outputSize + i];
-
-      int stride = curr->stride();
-      for (int k = 0; k < K; k++)
-      {
-        // input neuron at position i+k feeds into output neuron i
-        Neuron* src = prev->neurons_[(i * stride) + k];
-
-        auto* c = new Connection();
-        c->from = src;
-        c->to = dst;
-        c->filter = curr->filters_[f];   // shared filters
-        c->filterSlot = k;               // which weight slot
-        c->trainable = true;
-        // c->weight not used — weight lives in filter
-        // c->gradient not used — grad goes to filter->accumulateGrad
-
-        src->outConns.push_back(c);
-        dst->inConns.push_back(c);
-        allConns_.push_back(c);
-      }
     }
   }
 }

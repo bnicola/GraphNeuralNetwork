@@ -3,6 +3,7 @@
 #include "Dropout.h"
 #include "Residual.h"
 #include "Conv1d.h"
+#include "Conv2d.h"
 #include "Softmax.h"
 #include <vector>
 #include <random>
@@ -41,6 +42,7 @@ public:
     void addDropout  (double p = 0.2);
     void addResidual (int n, Activation act, int skipFromIdx);
     void addConv1D   (int kernelSize, Activation act, int stride = 1, int numFilters = 1);
+    void addConv2D(int inputHeight, int inputWidth, int kernelHeight, int kernelWidth, int strideH, int strideW, int numFilters, Activation act, double initStd);
     void addSoftmax();
 
     // ── PyTorch-style interface ───────────────────────────
@@ -77,6 +79,7 @@ private:
     void wireDense   (Layer* prev, Layer* curr);
     void wireSkip    (Layer* src,  Layer* dst);
     void wireConv1D  (Layer* prev, Conv1DLayer* curr, int numFilters);
+    void wireConv2D(Layer* prev, Conv2DLayer* curr);
 
     std::vector<double> getOutputs() const;
     double              xavier     (int fanIn, int fanOut) const;

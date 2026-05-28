@@ -23,6 +23,7 @@
     <ClCompile Include="Adam.cpp" />
     <ClCompile Include="Connection.cpp" />
     <ClCompile Include="Conv1d.cpp" />
+    <ClCompile Include="Conv2d.cpp" />
     <ClCompile Include="Dropout.cpp" />
     <ClCompile Include="Filter.cpp" />
     <ClCompile Include="Layer.cpp" />
@@ -38,6 +39,7 @@
     <ClInclude Include="Adam.h" />
     <ClInclude Include="Connection.h" />
     <ClInclude Include="Conv1d.h" />
+    <ClInclude Include="Conv2d.h" />
     <ClInclude Include="Dropout.h" />
     <ClInclude Include="Filter.h" />
     <ClInclude Include="Layer.h" />

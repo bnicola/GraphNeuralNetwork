@@ -29,6 +29,7 @@
     <ClCompile Include="Layer.cpp" />
     <ClCompile Include="Linear.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Maxpool.cpp" />
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="Neuron.cpp" />
     <ClCompile Include="Residual.cpp" />
@@ -44,6 +45,7 @@
     <ClInclude Include="Filter.h" />
     <ClInclude Include="Layer.h" />
     <ClInclude Include="Linear.h" />
+    <ClInclude Include="Maxpool.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="Neuron.h" />
     <ClInclude Include="Residual.h" />
@@ -133,7 +135,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>

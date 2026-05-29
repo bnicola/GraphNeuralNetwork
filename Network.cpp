@@ -273,6 +273,39 @@ void Network::wireConv2D(Layer* prev, Conv2DLayer* curr)
 }
 
 // =============================================================
+//  addMaxPool2D
+//  No connections created — MaxPool accesses the previous layer
+//  neurons directly via prevLayer_ pointer.
+//  User provides input dimensions explicitly.
+// =============================================================
+void Network::addMaxPool2D(int inputH, int inputW, int numChannels,             
+                           int poolH, int poolW,
+                           int strideH, int strideW)
+{
+  assert(!layers_.empty() && "add an input layer first");
+  assert(layers_.back()->size() == numChannels * inputH * inputW
+    && "addMaxPool2D: previous layer size does not match dimensions");
+
+  int   idx = (int)layers_.size();
+  auto* layer = new MaxPool2DLayer(idx,
+                                   inputH, inputW, numChannels,
+                                   poolH, poolW,
+                                   strideH, strideW);
+
+  // give MaxPool direct access to previous layer neurons
+  layer->setPrevLayer(layers_.back());
+
+  layers_.push_back(layer);
+
+  // wire output neurons to next layer via dense connections
+  // MaxPool output neurons need outConns so backward() can
+  // collect error from the next layer the normal way
+  // BUT we do NOT wire inConns — MaxPool reads prev directly
+  // We do this by simply pushing the layer with no inConn wiring
+  // outConns will be created when the NEXT layer is added via wireDense
+}
+
+// =============================================================
 //  forward
 //  Propagates inputs left to right through all layers.
 //  Dropout uses forwardWithMask(); all others use forward().

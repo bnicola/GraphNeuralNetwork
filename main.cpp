@@ -60,52 +60,58 @@ int Conv1DExample()
 
 int Conv2DExample()
 {
-  std::cout << "=== Simple Conv2D Test ===\n\n";
+  std::cout << "=== Simple Conv2D + MaxPool Test ===\n\n";
 
   Network net(42);
 
-  // Input: 28x28 image flattened (like MNIST)
+  // Input: 28x28 image flattened
   net.addLinear(784, Activation::LINEAR);
 
-  // First Conv2D: 28x28 → smaller feature maps
+  // Conv2D 1: 28x28 input, kernel 3x3, stride 1x1, 8 filters
+  // output: 8 x 26 x 26
   net.addConv2D(28, 28, 3, 3, 1, 1, 8, Activation::RELU, 0.3);
 
-  // Second Conv2D: further feature extraction
-  net.addConv2D(26, 26, 3, 3, 1, 1, 16, Activation::RELU, 0.3);
+  // MaxPool 1: 26x26 input, pool 2x2, stride 2x2
+  // output: 8 x 13 x 13
+  net.addMaxPool2D(26, 26, 8, 2, 2, 2, 2);
 
-  // Final classification head
-  net.addLinear(10, Activation::LINEAR);   // 10 classes
+  // Conv2D 2: 13x13 input, 8 channels, kernel 3x3, stride 1x1, 16 filters
+  // output: 16 x 11 x 11
+  net.addConv2D(13, 13, 3, 3, 1, 1, 16, Activation::RELU, 0.3);
+
+  // MaxPool 2: 11x11 input, pool 2x2, stride 2x2
+  // output: 16 x 5 x 5 = 400 neurons
+  // note: (11-2)/2 + 1 = 5
+  net.addMaxPool2D(11, 11, 16, 2, 2, 2, 2);
+
+  //net.addResidual(5408, Activation::TANH, 1);
+  // Flatten → classify
+  net.addLinear(10, Activation::LINEAR);
   net.addSoftmax();
 
   net.summary();
 
-  // Dummy test data (one sample)
-  std::vector<double> input(784, 0.0);     // flattened 28x28
-  // You can fill input with real data later
+  // Dummy test data
+  std::vector<double> input(784, 0.5);
+  std::vector<double> target = { 0, 0, 0, 0, 0.8, 0.2, 0, 0, 0, 0 };  // class 4
 
-  std::vector<double> target = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 };  // class 4
-
-  std::cout << "\nRunning one training step...\n";
-  double loss = 0.0;
-  for (int i = 0; i < 140; i++)
+  std::cout << "\nTraining...\n";
+  for (int i = 0; i < 100; i++)
   {
-    loss = net.train(input, target, 0.1);
-    std::cout << "Loss = " << loss << std::endl;
+    double loss = net.train(input, target, 0.1);
+    std::cout << "Step : " << i << ",  Loss = " << loss << std::endl;
   }
-
-  std::cout << "Loss = " << std::fixed << std::setprecision(6) << loss << "\n";
 
   std::cout << "\nPrediction (probabilities):\n";
   auto pred = net.predict(input);
   for (size_t i = 0; i < pred.size(); ++i)
   {
-    std::cout << "Class " << i << ": " << std::fixed << std::setprecision(4)
-      << pred[i] << "\n";
+    std::cout << "  Class " << i << ": "
+      << std::fixed << std::setprecision(2) << pred[i] << "\n";
   }
 
   return 0;
 }
-
 
 int main()
 {

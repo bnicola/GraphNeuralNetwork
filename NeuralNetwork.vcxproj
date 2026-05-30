@@ -27,6 +27,7 @@
     <ClCompile Include="Dropout.cpp" />
     <ClCompile Include="Filter.cpp" />
     <ClCompile Include="Layer.cpp" />
+    <ClCompile Include="LayerNorm.cpp" />
     <ClCompile Include="Linear.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Maxpool.cpp" />
@@ -44,6 +45,7 @@
     <ClInclude Include="Dropout.h" />
     <ClInclude Include="Filter.h" />
     <ClInclude Include="Layer.h" />
+    <ClInclude Include="LayerNorm.h" />
     <ClInclude Include="Linear.h" />
     <ClInclude Include="Maxpool.h" />
     <ClInclude Include="Network.h" />
@@ -151,6 +153,11 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

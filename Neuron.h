@@ -2,8 +2,17 @@
 #include "Activation.h"
 #include "Adam.h"
 #include "Connection.h"
+#include "Filter.h"   // needed for filter->weight() and accumulateGrad()
 #include <vector>
 #include <string>
+#include <unordered_map>
+#include <cassert>
+#include <iostream>
+#include <iomanip>
+#include <cmath>
+#include <fstream>
+#include <sstream>
+
 
 // =============================================================
 //  Neuron

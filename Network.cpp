@@ -1,10 +1,5 @@
 #include "Network.h"
-#include <cassert>
-#include <iostream>
-#include <iomanip>
-#include <cmath>
-#include <fstream>
-#include <sstream>
+
 
 // =============================================================
 //  Constructor / Destructor
@@ -305,6 +300,39 @@ void Network::addMaxPool2D(int inputH, int inputW, int numChannels,
   // outConns will be created when the NEXT layer is added via wireDense
 }
 
+void Network::addLayerNorm(double epsilon)
+{
+  assert(!layers_.empty() && "add an input layer first");
+
+  int   idx = (int)layers_.size();
+  int   n = layers_.back()->size();
+
+  auto* layer = new LayerNorm(idx, n, epsilon);
+
+  // give LayerNorm direct access to previous layer's neurons
+  // so backward() can write errors back — same pattern as MaxPool
+  layer->setPrevLayer(layers_.back());
+
+  layers_.push_back(layer);
+
+  // Wire pass-through output connections (weight=1, not trainable)
+  // so the NEXT layer can collect errors via outConns normally.
+  // This mirrors how Dropout is wired.
+  Layer* prev = layers_[layers_.size() - 2];
+  for (int i = 0; i < n; i++)
+  {
+    auto* c = new Connection();
+    c->from = prev->neurons_[i];
+    c->to = layer->neurons_[i];
+    c->weight = 1.0;
+    c->trainable = false;   // pass-through — not a learnable weight
+
+    prev->neurons_[i]->outConns.push_back(c);
+    layer->neurons_[i]->inConns.push_back(c);
+    allConns_.push_back(c);
+  }
+}
+
 // =============================================================
 //  forward
 //  Propagates inputs left to right through all layers.
@@ -594,137 +622,466 @@ double Network::xavier(int fanIn, int fanOut) const
 
 
 // =============================================================
-// save - Complete architecture + weights save
+//  Network::save()
+//
+//  File format (plain text, version 2):
+//
+//    version 2
+//    layers N
+//
+//    layer 0 Linear    size act
+//    layer 1 Conv1D    size kernelSize stride numFilters act
+//    layer 2 Conv1D    size kernelSize stride numFilters act
+//    layer 3 Linear    size act
+//    layer 4 Dropout   size rate
+//    layer 5 Residual  size act skipFromIdx
+//    layer 6 MaxPool2D size inputH inputW numChans poolH poolW strideH strideW
+//    layer 7 Softmax   size
+//
+//    weights
+//    L0 bias   v0 v1 v2 ...          (one per neuron)
+//    L0 dense  v0 v1 v2 ...          (all inConn weights, neuron-major order)
+//    L1 filter 0  v0 v1 v2 ...       (filter index then K weight values)
+//    L1 filter 1  v0 v1 v2 ...
+//    L1 bias   v0 v1 v2 ...
+//    ...
+//
+//  NOTES:
+//    - MaxPool2D and Dropout have no weights — only architecture line saved.
+//    - Softmax saves bias only (connections are fixed weight=1, not trainable).
+//    - Conv dense connections route through Filter, not Connection::weight.
+//    - Residual saves bias + dense inConn weights (skip conns are fixed w=1).
 // =============================================================
+
+// =============================================================
+//  Network::save()
+//
+//  File format (plain text, version 2):
+//
+//    version 2
+//    layers N
+//
+//    layer 0 Linear    size act
+//    layer 1 Conv1D    size kernelSize stride numFilters act
+//    layer 2 Conv1D    size kernelSize stride numFilters act
+//    layer 3 Linear    size act
+//    layer 4 Dropout   size rate
+//    layer 5 Residual  size act skipFromIdx
+//    layer 6 MaxPool2D size inputH inputW numChans poolH poolW strideH strideW
+//    layer 7 Softmax   size
+//
+//    weights
+//    L0 bias   v0 v1 v2 ...          (one per neuron)
+//    L0 dense  v0 v1 v2 ...          (all inConn weights, neuron-major order)
+//    L1 filter 0  v0 v1 v2 ...       (filter index then K weight values)
+//    L1 filter 1  v0 v1 v2 ...
+//    L1 bias   v0 v1 v2 ...
+//    ...
+//
+//  NOTES:
+//    - MaxPool2D and Dropout have no weights — only architecture line saved.
+//    - Softmax saves bias only (connections are fixed weight=1, not trainable).
+//    - Conv dense connections route through Filter, not Connection::weight.
+//    - Residual saves bias + dense inConn weights (skip conns are fixed w=1).
+// =============================================================
+
 bool Network::save(const std::string& filename) const
 {
-  std::ofstream file(filename);
-  if (!file.is_open())
+  std::ofstream f(filename);
+  if (!f.is_open())
   {
-    std::cerr << "Error: Cannot open file for saving: " << filename << "\n";
+    std::cerr << "Network::save — cannot open: " << filename << "\n";
     return false;
   }
 
-  file << "# Neural Network Save File v1.0\n";
-  file << "layers " << layers_.size() << "\n\n";
+  f << std::setprecision(10);   // enough precision to round-trip doubles
 
-  for (auto* layer : layers_)
+  // ── header ───────────────────────────────────────────────
+  f << "version 2\n";
+  f << "layers " << layers_.size() << "\n\n";
+
+  // ── architecture lines ───────────────────────────────────
+  for (auto* l : layers_)
   {
-    std::string type = layer->typeName();
+    f << "layer " << l->index << " ";
 
-    file << "layer " << layer->index
-      << " " << type
-      << " " << layer->size()
-      << " " << actName(layer->act) << "\n";
-
-    // Save neurons' biases and weights
-    for (auto* n : layer->neurons_)
+    if (auto* dl = dynamic_cast<Dropout*>(l))
     {
-      // Bias
-      file << "  bias " << n->bias << "\n";
+      f << "Dropout " << l->size() << " " << dl->rate() << "\n";
+    }
+    else if (auto* rl = dynamic_cast<Residual*>(l))
+    {
+      f << "Residual " << l->size() << " " << actName(l->act)
+        << " " << rl->skipFrom() << "\n";
+    }
+    else if (auto* cl = dynamic_cast<Conv1DLayer*>(l))
+    {
+      f << "Conv1D " << l->size()
+        << " " << cl->kernelSize()
+        << " " << cl->stride()
+        << " " << (int)cl->filters_.size()
+        << " " << actName(l->act) << "\n";
+    }
+    else if (auto* cl = dynamic_cast<Conv2DLayer*>(l))
+    {
+      f << "Conv2D " << l->size()
+        << " " << cl->inputHeight()
+        << " " << cl->inputWidth()
+        << " " << cl->kernelHeight()
+        << " " << cl->kernelWidth()
+        << " " << cl->strideH()
+        << " " << cl->strideW()
+        << " " << cl->numFilters()
+        << " " << actName(l->act) << "\n";
+    }
+    else if (auto* ml = dynamic_cast<MaxPool2DLayer*>(l))
+    {
+      f << "MaxPool2D " << l->size()
+        << " " << ml->inputH()
+        << " " << ml->inputW()
+        << " " << ml->numChans()
+        << " " << ml->poolH()
+        << " " << ml->poolW()
+        << " " << ml->strideH()
+        << " " << ml->strideW() << "\n";
+    }
+    else if (dynamic_cast<Softmax*>(l))
+    {
+      f << "Softmax " << l->size() << "\n";
+    }
+    else   // Linear (default)
+    {
+      f << "Linear " << l->size() << " " << actName(l->act) << "\n";
+    }
+  }
 
-      // Weights
+  // ── weights ──────────────────────────────────────────────
+  f << "\nweights\n";
+
+  for (auto* l : layers_)
+  {
+    std::string tag = "L" + std::to_string(l->index);
+
+    // ── Conv1D / Conv2D — save filter weights then biases ──
+    if (auto* cl = dynamic_cast<Conv1DLayer*>(l))
+    {
+      for (int fi = 0; fi < (int)cl->filters_.size(); fi++)
+      {
+        f << tag << " filter " << fi;
+        for (int k = 0; k < cl->filters_[fi]->size(); k++)
+          f << " " << cl->filters_[fi]->weight(k);
+        f << "\n";
+      }
+      // biases — one per output neuron
+      f << tag << " bias";
+      for (auto* n : l->neurons_) f << " " << n->bias;
+      f << "\n";
+      continue;
+    }
+
+    if (auto* cl = dynamic_cast<Conv2DLayer*>(l))
+    {
+      for (int fi = 0; fi < (int)cl->filters_.size(); fi++)
+      {
+        f << tag << " filter " << fi;
+        for (int k = 0; k < cl->filters_[fi]->size(); k++)
+          f << " " << cl->filters_[fi]->weight(k);
+        f << "\n";
+      }
+      f << tag << " bias";
+      for (auto* n : l->neurons_) f << " " << n->bias;
+      f << "\n";
+      continue;
+    }
+
+    // ── MaxPool2D / Dropout — no weights ──────────────────
+    if (dynamic_cast<MaxPool2DLayer*>(l)) continue;
+    if (dynamic_cast<Dropout*>(l))        continue;
+
+    // ── Linear / Residual / Softmax — bias + dense weights ─
+    // bias line
+    f << tag << " bias";
+    for (auto* n : l->neurons_) f << " " << n->bias;
+    f << "\n";
+
+    // Softmax has no trainable dense weights (fixed pass-through)
+    if (dynamic_cast<Softmax*>(l)) continue;
+
+    // dense weight line — all inConn weights, neuron-major order
+    // skip connections (trainable=false) are fixed at 1.0, not saved
+    f << tag << " dense";
+    for (auto* n : l->neurons_)
+    {
       for (auto* c : n->inConns)
       {
-        if (c->filter == nullptr && c->trainable)
-        {
-          file << "  weight " << c->weight << "\n";
-        }
+        if (c->trainable && c->filter == nullptr)
+          f << " " << c->weight;
       }
     }
-    file << "\n";
+    f << "\n";
   }
 
-  std::cout << "Model successfully saved to: " << filename << "\n";
+  std::cout << "Network saved to: " << filename << "\n";
   return true;
 }
 
 // =============================================================
-// load - Reconstructs the full network from file
+//  Network::load()
+//
+//  Sequence:
+//    1. Parse architecture lines → call the same add*() methods
+//       used when building the network manually. This guarantees
+//       identical wiring.
+//    2. Parse weight lines → overwrite biases and filter/conn weights.
+//
+//  The network must be empty before calling load().
+//  Any existing layers/connections are cleared first.
 // =============================================================
-bool Network::load(const std::string& filename)
+
+// ── helpers ──────────────────────────────────────────────────
+
+// Parse activation name string → enum
+static Activation parseAct(const std::string& s)
 {
-  std::ifstream file(filename);
-  if (!file.is_open())
-  {
-    std::cerr << "Error: Cannot open file: " << filename << "\n";
-    return false;
-  }
-
-  // Clear existing network
-  for (auto* c : allConns_) delete c;
-  for (auto* l : layers_) delete l;
-  layers_.clear();
-  allConns_.clear();
-
-  std::string line;
-  int expectedLayers = 0;
-  int currentLayer = -1;
-
-  while (std::getline(file, line))
-  {
-    if (line.empty() || line[0] == '#') continue;
-
-    std::istringstream iss(line);
-    std::string token;
-    iss >> token;
-
-    if (token == "layers")
-    {
-      iss >> expectedLayers;
-    }
-    else if (token == "layer")
-    {
-      int idx, size;
-      std::string type, actStr;
-      iss >> idx >> type >> size >> actStr;
-
-      currentLayer = idx;
-      Activation act = Activation::SIGMOID; // default
-
-      if (actStr == "linear") act = Activation::LINEAR;
-      else if (actStr == "relu") act = Activation::RELU;
-      else if (actStr == "sigmoid") act = Activation::SIGMOID;
-      else if (actStr == "tanh") act = Activation::TANH;
-
-      if (type == "Linear")
-      {
-        addLinear(size, act);
-      }
-      else if (type == "Dropout")
-      {
-        addDropout(0.2); // rate will be ignored on load for simplicity
-      }
-      else if (type == "Residual")
-      {
-        // For residual we need skip index — simplified version for now
-        addResidual(size, act, 0); // you may need to adjust skip index manually
-      }
-    }
-    else if (token == "bias" && currentLayer >= 0)
-    {
-      double value;
-      iss >> value;
-      // Note: This simplified version assumes order matches
-      // A production version would need better mapping
-      if (!layers_.empty() && currentLayer < (int)layers_.size())
-      {
-        auto* layer = layers_[currentLayer];
-        if (!layer->neurons_.empty())
-        {
-          // This is simplified - real version needs proper neuron indexing
-          layer->neurons_.back()->bias = value;
-        }
-      }
-    }
-    else if (token == "weight" && currentLayer >= 0)
-    {
-      double value;
-      iss >> value;
-      // Similar simplification
-    }
-  }
-
-  std::cout << "Model successfully loaded from: " << filename << "\n";
-  return true;
+  if (s == "relu")       return Activation::RELU;
+  if (s == "leaky_relu") return Activation::LEAKY_RELU;
+  if (s == "sigmoid")    return Activation::SIGMOID;
+  if (s == "tanh")       return Activation::TANH;
+  return Activation::LINEAR;
 }
+
+// Read a whitespace-separated list of doubles from a stream
+static std::vector<double> readDoubles(std::istringstream& ss)
+{
+  std::vector<double> vals;
+  double v;
+  while (ss >> v) vals.push_back(v);
+  return vals;
+}
+//
+//bool Network::load(const std::string& filename)
+//{
+//  std::ifstream f(filename);
+//  if (!f.is_open())
+//  {
+//    std::cerr << "Network::load — cannot open: " << filename << "\n";
+//    return false;
+//  }
+//
+//  // ── clear existing network ────────────────────────────────
+//  for (auto* c : allConns_) delete c;
+//  for (auto* l : layers_)   delete l;
+//  allConns_.clear();
+//  layers_.clear();
+//  t_ = 0;
+//
+//  std::string line;
+//  int version = 1;
+//
+//  // ── pass 1: architecture ─────────────────────────────────
+//  while (std::getline(f, line))
+//  {
+//    if (line.empty() || line[0] == '#') continue;
+//    if (line == "weights") break;           // stop at weights section
+//
+//    std::istringstream ss(line);
+//    std::string token;
+//    ss >> token;
+//
+//    if (token == "version") { ss >> version; continue; }
+//    if (token == "layers") { continue; }   // count not needed — just read
+//    if (token != "layer") { continue; }
+//
+//    int idx;
+//    std::string type;
+//    ss >> idx >> type;
+//
+//    if (type == "Linear")
+//    {
+//      int size; std::string act;
+//      ss >> size >> act;
+//      addLinear(size, parseAct(act));
+//    }
+//    else if (type == "Dropout")
+//    {
+//      double rate;
+//      ss >> rate;          // size is implicit — same as previous layer
+//      addDropout(rate);
+//    }
+//    else if (type == "Residual")
+//    {
+//      int size, skipIdx; std::string act;
+//      ss >> size >> act >> skipIdx;
+//      addResidual(size, parseAct(act), skipIdx);
+//    }
+//    else if (type == "Conv1D")
+//    {
+//      // size kernelSize stride numFilters act
+//      int size, kernelSize, stride, numFilters;
+//      std::string act;
+//      ss >> size >> kernelSize >> stride >> numFilters >> act;
+//      addConv1D(kernelSize, parseAct(act), stride, numFilters);
+//    }
+//    else if (type == "Conv2D")
+//    {
+//      // size inputH inputW kernelH kernelW strideH strideW numFilters act
+//      int size, inputH, inputW, kernelH, kernelW, strideH, strideW, numFilters;
+//      std::string act;
+//      ss >> size >> inputH >> inputW
+//        >> kernelH >> kernelW
+//        >> strideH >> strideW
+//        >> numFilters >> act;
+//      addConv2D(inputH, inputW, kernelH, kernelW,
+//        strideH, strideW, numFilters,
+//        parseAct(act), std::sqrt(1.0 / (kernelH * kernelW)));
+//    }
+//    else if (type == "MaxPool2D")
+//    {
+//      // size inputH inputW numChans poolH poolW strideH strideW
+//      int size, inputH, inputW, numChans, poolH, poolW, strideH, strideW;
+//      ss >> size >> inputH >> inputW >> numChans
+//        >> poolH >> poolW >> strideH >> strideW;
+//      addMaxPool2D(inputH, inputW, numChans, poolH, poolW, strideH, strideW);
+//    }
+//    else if (type == "Softmax")
+//    {
+//      addSoftmax();
+//    }
+//    else
+//    {
+//      std::cerr << "Network::load — unknown layer type: " << type << "\n";
+//      return false;
+//    }
+//  }
+//
+//  if (layers_.empty())
+//  {
+//    std::cerr << "Network::load — no layers found in file\n";
+//    return false;
+//  }
+//
+//  // ── pass 2: weights ───────────────────────────────────────
+//  // We track per-layer cursors for dense weights so we can
+//  // fill them in neuron-major, connection-major order —
+//  // the same order save() wrote them.
+//
+//  // For each layer, a flat list of dense weight values ready to apply
+//  std::unordered_map<int, std::vector<double>> denseWeights; // layerIdx → values
+//  std::unordered_map<int, std::vector<double>> biasValues;   // layerIdx → values
+//
+//  while (std::getline(f, line))
+//  {
+//    if (line.empty() || line[0] == '#') continue;
+//
+//    std::istringstream ss(line);
+//    std::string tag, kind;
+//    ss >> tag >> kind;
+//
+//    // tag = "L3", extract index
+//    if (tag.empty() || tag[0] != 'L') continue;
+//    int layerIdx = std::stoi(tag.substr(1));
+//
+//    if (layerIdx < 0 || layerIdx >= (int)layers_.size())
+//    {
+//      std::cerr << "Network::load — layer index out of range: " << layerIdx << "\n";
+//      continue;
+//    }
+//
+//    Layer* l = layers_[layerIdx];
+//
+//    if (kind == "bias")
+//    {
+//      auto vals = readDoubles(ss);
+//      if ((int)vals.size() != l->size())
+//      {
+//        std::cerr << "Network::load — bias count mismatch on L"
+//          << layerIdx << " (got " << vals.size()
+//          << ", expected " << l->size() << ")\n";
+//        return false;
+//      }
+//      for (int i = 0; i < l->size(); i++)
+//        l->neurons_[i]->bias = vals[i];
+//    }
+//    else if (kind == "dense")
+//    {
+//      // store for second pass — we need all biases loaded first
+//      // (not strictly required, but keeps the code clean)
+//      denseWeights[layerIdx] = readDoubles(ss);
+//    }
+//    else if (kind == "filter")
+//    {
+//      int filterIdx;
+//      ss >> filterIdx;
+//      auto vals = readDoubles(ss);
+//
+//      Filter* filter = nullptr;
+//      if (auto* cl = dynamic_cast<Conv1DLayer*>(l))
+//      {
+//        if (filterIdx < (int)cl->filters_.size())
+//          filter = cl->filters_[filterIdx];
+//      }
+//      else if (auto* cl = dynamic_cast<Conv2DLayer*>(l))
+//      {
+//        if (filterIdx < (int)cl->filters_.size())
+//          filter = cl->filters_[filterIdx];
+//      }
+//
+//      if (!filter)
+//      {
+//        std::cerr << "Network::load — filter not found: L"
+//          << layerIdx << " filter " << filterIdx << "\n";
+//        return false;
+//      }
+//
+//      if ((int)vals.size() != filter->size())
+//      {
+//        std::cerr << "Network::load — filter weight count mismatch on L"
+//          << layerIdx << " filter " << filterIdx << "\n";
+//        return false;
+//      }
+//
+//      // Filter doesn't expose a setter, so we update via accumulateGrad
+//      // trick: zero weights, then use the Adam state — actually we need
+//      // direct write access. We expose it via a friend or by using
+//      // the fact that Filter::weights_ is private.
+//      // CLEANEST SOLUTION: add Filter::setWeight(int slot, double val)
+//      // See note below — this requires one small addition to Filter.h
+//      for (int k = 0; k < filter->size(); k++)
+//        filter->setWeight(k, vals[k]);
+//    }
+//  }
+//
+//  // ── apply dense weights ───────────────────────────────────
+//  for (auto& [layerIdx, vals] : denseWeights)
+//  {
+//    Layer* l = layers_[layerIdx];
+//    int cursor = 0;
+//    for (auto* n : l->neurons_)
+//    {
+//      for (auto* c : n->inConns)
+//      {
+//        if (c->trainable && c->filter == nullptr)
+//        {
+//          if (cursor >= (int)vals.size())
+//          {
+//            std::cerr << "Network::load — dense weight underflow on L"
+//              << layerIdx << "\n";
+//            return false;
+//          }
+//          c->weight = vals[cursor++];
+//        }
+//      }
+//    }
+//    if (cursor != (int)vals.size())
+//    {
+//      std::cerr << "Network::load — dense weight count mismatch on L"
+//        << layerIdx << " (used " << cursor
+//        << ", had " << vals.size() << ")\n";
+//      return false;
+//    }
+//  }
+//
+//  std::cout << "Network loaded from: " << filename
+//    << " (" << layers_.size() << " layers)\n";
+//  return true;
+//}

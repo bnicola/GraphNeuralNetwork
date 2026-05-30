@@ -1,5 +1,5 @@
 #include "Neuron.h"
-#include "Filter.h"   // needed for filter->weight() and accumulateGrad()
+
 
 Neuron::Neuron(const std::string& name, Activation a)
   : id(name), act(a),

@@ -52,7 +52,7 @@ int Conv1DExample()
   {
     auto pred = net.predict(X[i]);
     std::cout << "Input " << i << " -> " << std::fixed << std::setprecision(4)
-      << pred[0] << " (target = " << Y[i][0] << ")\n";
+      << pred[0] << ", " << pred[1] << " (target = " << Y[i][0] << ", " << Y[i][1] << ")\n";
   }
 
   return 0;
@@ -66,26 +66,14 @@ int Conv2DExample()
 
   // Input: 28x28 image flattened
   net.addLinear(784, Activation::LINEAR);
-
-  // Conv2D 1: 28x28 input, kernel 3x3, stride 1x1, 8 filters
-  // output: 8 x 26 x 26
   net.addConv2D(28, 28, 3, 3, 1, 1, 8, Activation::RELU, 0.3);
-
-  // MaxPool 1: 26x26 input, pool 2x2, stride 2x2
-  // output: 8 x 13 x 13
   net.addMaxPool2D(26, 26, 8, 2, 2, 2, 2);
-
-  // Conv2D 2: 13x13 input, 8 channels, kernel 3x3, stride 1x1, 16 filters
-  // output: 16 x 11 x 11
   net.addConv2D(13, 13, 3, 3, 1, 1, 16, Activation::RELU, 0.3);
 
   // MaxPool 2: 11x11 input, pool 2x2, stride 2x2
   // output: 16 x 5 x 5 = 400 neurons
   // note: (11-2)/2 + 1 = 5
   net.addMaxPool2D(11, 11, 16, 2, 2, 2, 2);
-
-  //net.addResidual(5408, Activation::TANH, 1);
-  // Flatten → classify
   net.addLinear(10, Activation::LINEAR);
   net.addSoftmax();
 
@@ -93,7 +81,7 @@ int Conv2DExample()
 
   // Dummy test data
   std::vector<double> input(784, 0.5);
-  std::vector<double> target = { 0, 0, 0, 0, 0.8, 0.2, 0, 0, 0, 0 };  // class 4
+  std::vector<double> target = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 };  // class 4
 
   std::cout << "\nTraining...\n";
   for (int i = 0; i < 100; i++)
@@ -115,8 +103,7 @@ int Conv2DExample()
 
 int main()
 {
-  //Conv1DExample();
+  Conv1DExample();
   Conv2DExample();
-
   return 0;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "Layer.h"
 #include "Filter.h"
+#include <cassert>
 
 class Conv2DLayer : public Layer
 {

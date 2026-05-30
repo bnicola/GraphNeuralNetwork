@@ -1,4 +1,3 @@
-// Residual.cpp
 #include "Residual.h"
 
 Residual::Residual(int index, int numNeurons, Activation act, int skipFromIdx)

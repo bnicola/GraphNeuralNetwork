@@ -1,14 +1,11 @@
-// Maxpool.h
 #pragma once
 
 #include "Layer.h"
 #include "Filter.h"   
 #include <vector>
 #include <string>
-
-// Forward declaration
-class Neuron;
-class Layer;
+#include <cassert>
+#include <algorithm>
 
 class MaxPool2DLayer : public Layer
 {

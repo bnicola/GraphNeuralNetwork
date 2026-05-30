@@ -1,6 +1,4 @@
-// Conv2DLayer.cpp
 #include "Conv2d.h"
-#include <cassert>
 
 Conv2DLayer::Conv2DLayer(int index, 
                          int inputHeight, 

@@ -1,4 +1,5 @@
 #include "Dropout.h"
+#include "Filter.h"
 
 Dropout::Dropout(int idx, int n, double rate, std::mt19937& rng)
   : Layer(idx, Activation::LINEAR),
@@ -48,7 +49,8 @@ void Dropout::backward()
     neurons_[i]->error = 0.0;
     for (auto* c : neurons_[i]->outConns)
     {
-      neurons_[i]->error += c->weight * c->to->error;
+      double w = (c->filter != nullptr) ? c->filter->weight(c->filterSlot) : c->weight;
+      neurons_[i]->error += w * c->to->error;
     }
 
     // dropped neuron: zero error — no gradient flows bac

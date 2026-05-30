@@ -1,7 +1,4 @@
-// MaxPool2DLayer.cpp
 #include "Maxpool.h"
-#include <cassert>
-#include <algorithm>
 
 MaxPool2DLayer::MaxPool2DLayer(int idx,
   int inputH, int inputW, int numChannels,

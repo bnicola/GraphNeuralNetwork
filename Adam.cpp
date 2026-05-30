@@ -1,5 +1,5 @@
 #include "Adam.h"
-#include <cmath>
+
 
 AdamState::AdamState()
   : m_(0.0), v_(0.0)

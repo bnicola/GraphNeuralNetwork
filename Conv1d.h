@@ -1,6 +1,7 @@
 #pragma once
 #include "Layer.h"
 #include "Filter.h"
+#include <cassert>
 
 // =============================================================
 //  Conv1DLayer  (PyTorch: nn.Conv1d)

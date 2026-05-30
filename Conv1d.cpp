@@ -1,5 +1,4 @@
 #include "Conv1d.h"
-#include <cassert>
 
 Conv1DLayer::Conv1DLayer(int index, int prevSize, int kernelSize,
   int stride, int numFilters, Activation act, double initStd)
@@ -80,9 +79,10 @@ void Conv1DLayer::step(double lr, int t)
   }
 
   // Update shared filter weights with averaged gradient
+  int contribPerFilter = (int)neurons_.size() / numFilters_;
   for (auto* f : filters_)
   {
-    f->step(lr, t, (int)neurons_.size());
+    f->step(lr, t, contribPerFilter);
   }
 }
 

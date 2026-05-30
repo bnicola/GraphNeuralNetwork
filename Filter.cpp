@@ -1,6 +1,4 @@
 #include "Filter.h"
-#include <random>
-#include <stdexcept>
 
 Filter::Filter(int kernelSize, double initStd)
     : kernelSize_(kernelSize),

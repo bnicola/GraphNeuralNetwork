@@ -2,7 +2,8 @@
 #include "Adam.h"
 #include <vector>
 #include <string>
-
+#include <random>
+#include <stdexcept>
 // =============================================================
 //  Filter
 //

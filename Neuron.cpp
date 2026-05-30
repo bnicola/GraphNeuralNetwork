@@ -109,17 +109,16 @@ void Neuron::backward()
       // dense: accumulate on connection itself as before
       c->gradient += grad;      
     }
+  }
+  biasGradient += delta;
 
-    biasGradient += delta;
-
-    // skip connections: no act' (added after activation)
-    // gradient accumulates here but is never applied in step()
-    for (auto* c : inConns)
+  // skip connections: no act' (added after activation)
+  // gradient accumulates here but is never applied in step()
+  for (auto* c : inConns)
+  {
+    if (c->trainable == false)
     {
-      if (c->trainable == false)
-      {
-        c->gradient += error * c->from->output;
-      }
+      c->gradient += error * c->from->output;
     }
   }
 }

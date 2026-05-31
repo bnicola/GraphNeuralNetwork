@@ -64,6 +64,7 @@ public:
     // read-only access
     int    size()               const { return kernelSize_; }
     double weight  (int slot)   const { return weights_[slot]; }
+    void   setWeight(int slot, double val) { weights_[slot] = val; }
     double gradient(int slot)   const { return gradients_[slot]; }
 
     // called by Neuron::backward() to accumulate gradient

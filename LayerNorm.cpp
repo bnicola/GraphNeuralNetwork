@@ -1,7 +1,4 @@
 #include "LayerNorm.h"
-#include <cmath>
-#include <numeric>
-#include <cassert>
 
 // =============================================================
 //  Constructor

@@ -9,6 +9,7 @@
 #include "Softmax.h"
 #include <vector>
 #include <random>
+#include <map>
 
 // =============================================================
 //  Network  (PyTorch: nn.Module / nn.Sequential)

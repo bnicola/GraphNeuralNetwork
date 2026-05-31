@@ -858,230 +858,275 @@ static std::vector<double> readDoubles(std::istringstream& ss)
   while (ss >> v) vals.push_back(v);
   return vals;
 }
-//
-//bool Network::load(const std::string& filename)
-//{
-//  std::ifstream f(filename);
-//  if (!f.is_open())
-//  {
-//    std::cerr << "Network::load — cannot open: " << filename << "\n";
-//    return false;
-//  }
-//
-//  // ── clear existing network ────────────────────────────────
-//  for (auto* c : allConns_) delete c;
-//  for (auto* l : layers_)   delete l;
-//  allConns_.clear();
-//  layers_.clear();
-//  t_ = 0;
-//
-//  std::string line;
-//  int version = 1;
-//
-//  // ── pass 1: architecture ─────────────────────────────────
-//  while (std::getline(f, line))
-//  {
-//    if (line.empty() || line[0] == '#') continue;
-//    if (line == "weights") break;           // stop at weights section
-//
-//    std::istringstream ss(line);
-//    std::string token;
-//    ss >> token;
-//
-//    if (token == "version") { ss >> version; continue; }
-//    if (token == "layers") { continue; }   // count not needed — just read
-//    if (token != "layer") { continue; }
-//
-//    int idx;
-//    std::string type;
-//    ss >> idx >> type;
-//
-//    if (type == "Linear")
-//    {
-//      int size; std::string act;
-//      ss >> size >> act;
-//      addLinear(size, parseAct(act));
-//    }
-//    else if (type == "Dropout")
-//    {
-//      double rate;
-//      ss >> rate;          // size is implicit — same as previous layer
-//      addDropout(rate);
-//    }
-//    else if (type == "Residual")
-//    {
-//      int size, skipIdx; std::string act;
-//      ss >> size >> act >> skipIdx;
-//      addResidual(size, parseAct(act), skipIdx);
-//    }
-//    else if (type == "Conv1D")
-//    {
-//      // size kernelSize stride numFilters act
-//      int size, kernelSize, stride, numFilters;
-//      std::string act;
-//      ss >> size >> kernelSize >> stride >> numFilters >> act;
-//      addConv1D(kernelSize, parseAct(act), stride, numFilters);
-//    }
-//    else if (type == "Conv2D")
-//    {
-//      // size inputH inputW kernelH kernelW strideH strideW numFilters act
-//      int size, inputH, inputW, kernelH, kernelW, strideH, strideW, numFilters;
-//      std::string act;
-//      ss >> size >> inputH >> inputW
-//        >> kernelH >> kernelW
-//        >> strideH >> strideW
-//        >> numFilters >> act;
-//      addConv2D(inputH, inputW, kernelH, kernelW,
-//        strideH, strideW, numFilters,
-//        parseAct(act), std::sqrt(1.0 / (kernelH * kernelW)));
-//    }
-//    else if (type == "MaxPool2D")
-//    {
-//      // size inputH inputW numChans poolH poolW strideH strideW
-//      int size, inputH, inputW, numChans, poolH, poolW, strideH, strideW;
-//      ss >> size >> inputH >> inputW >> numChans
-//        >> poolH >> poolW >> strideH >> strideW;
-//      addMaxPool2D(inputH, inputW, numChans, poolH, poolW, strideH, strideW);
-//    }
-//    else if (type == "Softmax")
-//    {
-//      addSoftmax();
-//    }
-//    else
-//    {
-//      std::cerr << "Network::load — unknown layer type: " << type << "\n";
-//      return false;
-//    }
-//  }
-//
-//  if (layers_.empty())
-//  {
-//    std::cerr << "Network::load — no layers found in file\n";
-//    return false;
-//  }
-//
-//  // ── pass 2: weights ───────────────────────────────────────
-//  // We track per-layer cursors for dense weights so we can
-//  // fill them in neuron-major, connection-major order —
-//  // the same order save() wrote them.
-//
-//  // For each layer, a flat list of dense weight values ready to apply
-//  std::unordered_map<int, std::vector<double>> denseWeights; // layerIdx → values
-//  std::unordered_map<int, std::vector<double>> biasValues;   // layerIdx → values
-//
-//  while (std::getline(f, line))
-//  {
-//    if (line.empty() || line[0] == '#') continue;
-//
-//    std::istringstream ss(line);
-//    std::string tag, kind;
-//    ss >> tag >> kind;
-//
-//    // tag = "L3", extract index
-//    if (tag.empty() || tag[0] != 'L') continue;
-//    int layerIdx = std::stoi(tag.substr(1));
-//
-//    if (layerIdx < 0 || layerIdx >= (int)layers_.size())
-//    {
-//      std::cerr << "Network::load — layer index out of range: " << layerIdx << "\n";
-//      continue;
-//    }
-//
-//    Layer* l = layers_[layerIdx];
-//
-//    if (kind == "bias")
-//    {
-//      auto vals = readDoubles(ss);
-//      if ((int)vals.size() != l->size())
-//      {
-//        std::cerr << "Network::load — bias count mismatch on L"
-//          << layerIdx << " (got " << vals.size()
-//          << ", expected " << l->size() << ")\n";
-//        return false;
-//      }
-//      for (int i = 0; i < l->size(); i++)
-//        l->neurons_[i]->bias = vals[i];
-//    }
-//    else if (kind == "dense")
-//    {
-//      // store for second pass — we need all biases loaded first
-//      // (not strictly required, but keeps the code clean)
-//      denseWeights[layerIdx] = readDoubles(ss);
-//    }
-//    else if (kind == "filter")
-//    {
-//      int filterIdx;
-//      ss >> filterIdx;
-//      auto vals = readDoubles(ss);
-//
-//      Filter* filter = nullptr;
-//      if (auto* cl = dynamic_cast<Conv1DLayer*>(l))
-//      {
-//        if (filterIdx < (int)cl->filters_.size())
-//          filter = cl->filters_[filterIdx];
-//      }
-//      else if (auto* cl = dynamic_cast<Conv2DLayer*>(l))
-//      {
-//        if (filterIdx < (int)cl->filters_.size())
-//          filter = cl->filters_[filterIdx];
-//      }
-//
-//      if (!filter)
-//      {
-//        std::cerr << "Network::load — filter not found: L"
-//          << layerIdx << " filter " << filterIdx << "\n";
-//        return false;
-//      }
-//
-//      if ((int)vals.size() != filter->size())
-//      {
-//        std::cerr << "Network::load — filter weight count mismatch on L"
-//          << layerIdx << " filter " << filterIdx << "\n";
-//        return false;
-//      }
-//
-//      // Filter doesn't expose a setter, so we update via accumulateGrad
-//      // trick: zero weights, then use the Adam state — actually we need
-//      // direct write access. We expose it via a friend or by using
-//      // the fact that Filter::weights_ is private.
-//      // CLEANEST SOLUTION: add Filter::setWeight(int slot, double val)
-//      // See note below — this requires one small addition to Filter.h
-//      for (int k = 0; k < filter->size(); k++)
-//        filter->setWeight(k, vals[k]);
-//    }
-//  }
-//
-//  // ── apply dense weights ───────────────────────────────────
-//  for (auto& [layerIdx, vals] : denseWeights)
-//  {
-//    Layer* l = layers_[layerIdx];
-//    int cursor = 0;
-//    for (auto* n : l->neurons_)
-//    {
-//      for (auto* c : n->inConns)
-//      {
-//        if (c->trainable && c->filter == nullptr)
-//        {
-//          if (cursor >= (int)vals.size())
-//          {
-//            std::cerr << "Network::load — dense weight underflow on L"
-//              << layerIdx << "\n";
-//            return false;
-//          }
-//          c->weight = vals[cursor++];
-//        }
-//      }
-//    }
-//    if (cursor != (int)vals.size())
-//    {
-//      std::cerr << "Network::load — dense weight count mismatch on L"
-//        << layerIdx << " (used " << cursor
-//        << ", had " << vals.size() << ")\n";
-//      return false;
-//    }
-//  }
-//
-//  std::cout << "Network loaded from: " << filename
-//    << " (" << layers_.size() << " layers)\n";
-//  return true;
-//}
+
+bool Network::load(const std::string& filename)
+{
+  std::ifstream f(filename.c_str());
+
+  if (!f.is_open())
+  {
+    std::cerr << "Network::load - cannot open: "
+      << filename << "\n";
+    return false;
+  }
+
+  // ------------------------------------------
+  // clear existing network
+  // ------------------------------------------
+  for (size_t i = 0; i < allConns_.size(); i++)
+    delete allConns_[i];
+
+  for (size_t i = 0; i < layers_.size(); i++)
+    delete layers_[i];
+
+  allConns_.clear();
+  layers_.clear();
+  t_ = 0;
+
+  std::string line;
+
+  // ==========================================
+  // PASS 1 : architecture
+  // ==========================================
+  while (std::getline(f, line))
+  {
+    if (line.empty() || line[0] == '#')
+      continue;
+
+    if (line == "weights")
+      break;
+
+    std::istringstream ss(line);
+
+    std::string token;
+    ss >> token;
+
+    if (token == "version")
+      continue;
+
+    if (token == "layers")
+      continue;
+
+    if (token != "layer")
+      continue;
+
+    int idx;
+    std::string type;
+
+    ss >> idx >> type;
+
+    if (type == "Linear")
+    {
+      int size;
+      std::string act;
+
+      ss >> size >> act;
+
+      // -----------------------------------
+      // first layer = input layer
+      // no dense wiring should occur
+      // -----------------------------------
+      if (layers_.empty())
+      {
+        int idx = (int)layers_.size();
+
+        Layer* layer = new Linear(idx, size, parseAct(act));
+
+        layers_.push_back(layer);
+      }
+      else
+      {
+        addLinear(size, parseAct(act));
+      }
+    }
+    else if (type == "Dropout")
+    {
+      int size;
+      double rate;
+
+      ss >> size >> rate;
+
+      addDropout(rate);
+    }
+    else if (type == "Residual")
+    {
+      int size;
+      int skipIdx;
+      std::string act;
+
+      ss >> size >> act >> skipIdx;
+
+      addResidual(size, parseAct(act), skipIdx);
+    }
+    else if (type == "Conv1D")
+    {
+      int size;
+      int kernelSize;
+      int stride;
+      int numFilters;
+
+      std::string act;
+
+      ss >> size
+        >> kernelSize
+        >> stride
+        >> numFilters
+        >> act;
+
+      addConv1D(kernelSize, parseAct(act), stride, numFilters);
+    }
+    else if (type == "Conv2D")
+    {
+      int size;
+      int inputH;
+      int inputW;
+      int kernelH;
+      int kernelW;
+      int strideH;
+      int strideW;
+      int numFilters;
+
+      std::string act;
+
+      ss >> size
+        >> inputH
+        >> inputW
+        >> kernelH
+        >> kernelW
+        >> strideH
+        >> strideW
+        >> numFilters
+        >> act;
+
+      addConv2D(inputH, inputW, kernelH, kernelW, strideH, strideW, numFilters, parseAct(act), std::sqrt(1.0 / (kernelH * kernelW)));
+    }
+    else if (type == "MaxPool2D")
+    {
+      int size;
+      int inputH;
+      int inputW;
+      int numCh;
+      int poolH;
+      int poolW;
+      int strideH;
+      int strideW;
+
+      ss >> size
+        >> inputH
+        >> inputW
+        >> numCh
+        >> poolH
+        >> poolW
+        >> strideH
+        >> strideW;
+
+      addMaxPool2D(inputH, inputW, numCh, poolH, poolW, strideH, strideW);
+    }
+    else if (type == "Softmax")
+    {
+      addSoftmax();
+    }
+  }
+
+  // ==========================================
+  // PASS 2 : weights
+  // ==========================================
+  std::map<int, std::vector<double> > denseWeights;
+
+  while (std::getline(f, line))
+  {
+    if (line.empty() || line[0] == '#')
+      continue;
+
+    std::istringstream ss(line);
+
+    std::string tag;
+    std::string kind;
+
+    ss >> tag >> kind;
+
+    if (tag.empty() || tag[0] != 'L')
+      continue;
+
+    int layerIdx = std::atoi(tag.substr(1).c_str());
+
+    Layer* l = layers_[layerIdx];
+
+    if (kind == "bias")
+    {
+      std::vector<double> vals = readDoubles(ss);
+
+      for (int i = 0; i < l->size(); i++)
+      {
+        l->neurons_[i]->bias = vals[i];
+      }
+    }
+    else if (kind == "dense")
+    {
+      denseWeights[layerIdx] = readDoubles(ss);
+    }
+    else if (kind == "filter")
+    {
+      int filterIdx;
+
+      ss >> filterIdx;
+
+      std::vector<double> vals = readDoubles(ss);
+
+      Conv1DLayer* c1 = dynamic_cast<Conv1DLayer*>(l);
+
+      Conv2DLayer* c2 = dynamic_cast<Conv2DLayer*>(l);
+
+      Filter* filter = nullptr;
+
+      if (c1)
+        filter = c1->filters_[filterIdx];
+
+      if (c2)
+        filter = c2->filters_[filterIdx];
+
+      if (!filter)
+        return false;
+
+      for (int k = 0; k < filter->size(); k++)
+      {
+        filter->setWeight(k,  vals[k]);
+      }
+    }
+  }
+
+  // ==========================================
+  // apply dense weights
+  // ==========================================
+  std::map<int, std::vector<double> >::iterator it;
+
+  for (it = denseWeights.begin(); it != denseWeights.end(); ++it)
+  {
+    int layerIdx = it->first;
+
+    std::vector<double>& vals = it->second;
+
+    Layer* l = layers_[layerIdx];
+
+    int cursor = 0;
+
+    for (size_t ni = 0; ni < l->neurons_.size(); ni++)
+    {
+      Neuron* n = l->neurons_[ni];
+
+      for (size_t ci = 0; ci < n->inConns.size(); ci++)
+      {
+        Connection* c = n->inConns[ci];
+
+        if (c->trainable && c->filter == nullptr)
+        {
+          c->weight = vals[cursor++];
+        }
+      }
+    }
+  }
+
+  std::cout << "Network loaded from: " << filename << "\n";
+
+  return true;
+}

@@ -2,6 +2,9 @@
 #include "Layer.h"
 #include "Adam.h"
 #include <vector>
+#include <cmath>
+#include <numeric>
+#include <cassert>
 
 // =============================================================
 //  LayerNorm  (PyTorch: nn.LayerNorm)

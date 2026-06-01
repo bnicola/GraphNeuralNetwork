@@ -4,7 +4,7 @@
 #include "Residual.h"
 #include "Conv1d.h"
 #include "Conv2d.h"
-#include "Maxpool.h"
+#include "Maxpool2D.h"
 #include "LayerNorm.h"
 #include "Softmax.h"
 #include <vector>

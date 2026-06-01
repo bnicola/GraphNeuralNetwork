@@ -30,7 +30,7 @@
     <ClCompile Include="LayerNorm.cpp" />
     <ClCompile Include="Linear.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Maxpool.cpp" />
+    <ClCompile Include="Maxpool2D.cpp" />
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="Neuron.cpp" />
     <ClCompile Include="Residual.cpp" />
@@ -47,7 +47,7 @@
     <ClInclude Include="Layer.h" />
     <ClInclude Include="LayerNorm.h" />
     <ClInclude Include="Linear.h" />
-    <ClInclude Include="Maxpool.h" />
+    <ClInclude Include="Maxpool2D.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="Neuron.h" />
     <ClInclude Include="Residual.h" />

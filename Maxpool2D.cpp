@@ -1,4 +1,4 @@
-#include "Maxpool.h"
+#include "Maxpool2D.h"
 
 MaxPool2DLayer::MaxPool2DLayer(int idx,
   int inputH, int inputW, int numChannels,

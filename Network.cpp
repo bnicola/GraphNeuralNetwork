@@ -300,6 +300,27 @@ void Network::addMaxPool2D(int inputH, int inputW, int numChannels,
   // outConns will be created when the NEXT layer is added via wireDense
 }
 
+// =============================================================
+//  addMaxPool1D
+//  No connections created — MaxPool accesses the previous layer
+//  neurons directly via prevLayer_ pointer.
+//  User provides input dimensions explicitly.
+// =============================================================
+void Network::addMaxPool1D(int inputSize, int numChannels, int poolSize, int stride)
+{
+  assert(!layers_.empty() && "add an input layer first");
+  assert(layers_.back()->size() == numChannels * inputSize
+    && "addMaxPool1D: previous layer size does not match dimensions");
+
+  int   idx = (int)layers_.size();
+  auto* layer = new MaxPool1DLayer(idx, inputSize, numChannels, poolSize, stride);
+
+  // give MaxPool direct access to previous layer neurons
+  layer->setPrevLayer(layers_.back());
+
+  layers_.push_back(layer);
+}
+
 void Network::addLayerNorm(double epsilon)
 {
   assert(!layers_.empty() && "add an input layer first");

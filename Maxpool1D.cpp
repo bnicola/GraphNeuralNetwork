@@ -1,9 +1,6 @@
 #include "Maxpool1D.h"
 
-MaxPool1DLayer::MaxPool1DLayer(int idx,
-  int inputSize, int numChannels,
-  int poolSize,
-  int stride)
+MaxPool1DLayer::MaxPool1DLayer(int idx, int inputSize, int numChannels, int poolSize, int stride)
   : Layer(idx, Activation::LINEAR),
   inputSize_(inputSize), numChans_(numChannels),
   poolSize_(poolSize),

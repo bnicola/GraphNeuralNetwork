@@ -11,11 +11,12 @@ int Conv1DExample()
 
   net.addLinear(7,   Activation::LINEAR); // input
   net.addLinear(120, Activation::LEAKY_RELU);   
-  net.addDropout(0.5);
+  net.addDropout(0.3);
   net.addResidual(7, Activation::RELU, 0);
   net.addConv1D(3,   Activation::LEAKY_RELU, 1, 25);
+  net.addMaxPool1D(5, 25, 2, 1);
   net.addResidual(7, Activation::TANH, 3);
-  net.addDropout(0.5);
+  net.addDropout(0.3);
   net.addLinear(2,   Activation::LINEAR);
   net.addSoftmax();
 

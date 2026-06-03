@@ -1,8 +1,6 @@
 #include "Conv2d.h"
 
-Conv2DLayer::Conv2DLayer(int index, 
-                         int inputHeight, 
-                         int inputWidth,
+Conv2DLayer::Conv2DLayer(int index, Layer* prev,
                          int kernelHeight, 
                          int kernelWidth,
                          int strideH, int strideW,
@@ -10,8 +8,8 @@ Conv2DLayer::Conv2DLayer(int index,
                          Activation act,
                          double initStd)
   : Layer(index, act)
-  , inputH_(inputHeight)
-  , inputW_(inputWidth)
+  , inputH_(prev->height())
+  , inputW_(prev->width())
   , kernelH_(kernelHeight)
   , kernelW_(kernelWidth)
   , strideH_(strideH)
@@ -21,14 +19,18 @@ Conv2DLayer::Conv2DLayer(int index,
   assert(strideH >= 1 && strideW >= 1 && "Stride must be at least 1");
   assert(numFilters >= 1 && "Must have at least 1 filter");
 
+  inputChannels_ = prev->channels();
   for (int f = 0; f < numFilters; f++)
   {
-    filters_.push_back(new Filter(kernelHeight * kernelWidth, initStd));
+    int filterParams = kernelH_ * kernelW_ * inputChannels_;
+    filters_.push_back(new Filter(filterParams, initStd));
   }
 
-  int outH = outputHeight(inputH_, kernelH_, strideH_);
-  int outW = outputWidth(inputW_, kernelW_, strideW_);
-  int totalNeurons = numFilters * outH * outW;
+  // The layer Shape (needed by next layer to get the input dimensions).
+  height_   = outputHeight(inputH_, kernelH_, strideH_);
+  width_    = outputWidth(inputW_, kernelW_, strideW_);
+  channels_ = numFilters_;
+  int totalNeurons = numFilters * height_ * width_;
 
   createNeurons(totalNeurons, "L" + std::to_string(index) + "-C2");
 }

@@ -14,6 +14,10 @@ MaxPool1DLayer::MaxPool1DLayer(int idx, int inputSize, int numChannels, int pool
   int total = numChans_ * outputSize_;
   createNeurons(total, "L" + std::to_string(idx) + "-MP");
 
+  height_ = 1;
+  width_ = outputSize_;
+  channels_ = numChans_;
+
   winners_.resize(total, nullptr);
 }
 

@@ -5,6 +5,10 @@ Residual::Residual(int index, int numNeurons, Activation act, int skipFromIdx)
   , skipFromIdx_(skipFromIdx)
 {
   createNeurons(numNeurons, "L" + std::to_string(index) + "-R");
+
+  height_ = 1;
+  width_ = numNeurons;
+  channels_ = 1;
 }
 
 void Residual::forward()

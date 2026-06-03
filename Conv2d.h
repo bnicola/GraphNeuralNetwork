@@ -6,8 +6,7 @@
 class Conv2DLayer : public Layer
 {
 public:
-  Conv2DLayer(int index,
-              int inputHeight, int inputWidth,
+  Conv2DLayer(int index, Layer* prev,
               int kernelHeight = 3, int kernelWidth = 3,
               int strideH = 1, int strideW = 1,
               int numFilters = 1,
@@ -38,6 +37,7 @@ private:
   int kernelH_, kernelW_;
   int strideH_, strideW_;
   int numFilters_;
+  int inputChannels_;
 
   static int outputHeight(int inH, int kH, int sH);
   static int outputWidth(int inW, int kW, int sW);

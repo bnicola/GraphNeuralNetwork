@@ -20,6 +20,10 @@ MaxPool2DLayer::MaxPool2DLayer(int idx,
   int total = numChans_ * outputH_ * outputW_;
   createNeurons(total, "L" + std::to_string(idx) + "-MP");
 
+  height_ = outputH_;
+  width_ = outputW_;
+  channels_ = numChans_;
+
   winners_.resize(total, nullptr);
 }
 

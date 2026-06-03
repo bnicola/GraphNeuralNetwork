@@ -43,10 +43,12 @@ public:
 
     // ── layer builders ───────────────────────────────────
     void addLinear   (int n, Activation act);
+    // Overloaded addLinear for input layers of multiple channels and different width and heights
+    void addLinear(int height, int width, int channels, Activation act);
     void addDropout  (double p = 0.2);
     void addResidual (int n, Activation act, int skipFromIdx);
     void addConv1D   (int kernelSize, Activation act, int stride = 1, int numFilters = 1);
-    void addMaxPool1D(int inputSize, int numChannels, int poolSize, int stride);
+    void addMaxPool1D(int poolSize, int stride);
     void addConv2D   (int inputHeight, int inputWidth, int kernelHeight, int kernelWidth, int strideH, int strideW, int numFilters, Activation act, double initStd);
     void addMaxPool2D(int inputH, int inputW, int numChannels, int poolH, int poolW, int strideH = 2, int strideW = 2);
     void addLayerNorm(double epsilon);

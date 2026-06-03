@@ -16,6 +16,9 @@ LayerNorm::LayerNorm(int index, int n, double epsilon)
     , invStd_   (1.0)
 {
     createNeurons(n, "L" + std::to_string(index) + "-LN");
+    height_ = 1;
+    width_ = n;
+    channels_ = 1;
 }
 
 // =============================================================

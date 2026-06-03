@@ -1,22 +1,36 @@
 #include "Conv1d.h"
+#include <cassert>
 
-Conv1DLayer::Conv1DLayer(int index, int prevSize, int kernelSize,
-  int stride, int numFilters, Activation act, double initStd)
+Conv1DLayer::Conv1DLayer(int index, Layer* prevLayer,      
+                         int kernelSize, int stride, int numFilters,        
+                         Activation act, double initStd)
   : Layer(index, act)
   , kernelSize_(kernelSize)
   , stride_(stride)
   , numFilters_(numFilters)
 {
+  assert(prevLayer != nullptr);
   assert(stride >= 1);
-  // Create the number of filter (for different 
-  // features to be captred).
+  assert(kernelSize >= 1);
+
+  inputChannels_ = prevLayer->channels();
+  inputSeqLen_ = prevLayer->width();
+
+  outputSeqLen_ = (inputSeqLen_ - kernelSize) / stride + 1;
+  assert(outputSeqLen_ > 0);
+
+  channels_ = numFilters_;
+  height_ = 1;
+  width_ = outputSeqLen_;
+
+  // Each output channel has its own filter of size (inputChannels * kernelSize)
   for (int f = 0; f < numFilters; f++)
   {
-    filters_.push_back(new Filter(kernelSize, initStd));
+    int filterParams = kernelSize * inputChannels_;
+    filters_.push_back(new Filter(filterParams, initStd));
   }
-  int n = outputSize(prevSize, kernelSize, stride);
-  assert(n > 0);
-  int totalNeurons = numFilters * outputSize(prevSize, kernelSize, stride);
+
+  int totalNeurons = numFilters * outputSeqLen_;
   createNeurons(totalNeurons, "L" + std::to_string(index) + "-C");
 }
 
@@ -24,11 +38,6 @@ Conv1DLayer::~Conv1DLayer()
 {
   for (auto* f : filters_)
     delete f;
-}
-
-int Conv1DLayer::outputSize(int prevSize, int kernelSize, int stride)
-{
-  return (prevSize - kernelSize) / stride + 1;
 }
 
 // =============================================================
@@ -39,9 +48,7 @@ int Conv1DLayer::outputSize(int prevSize, int kernelSize, int stride)
 void Conv1DLayer::forward()
 {
   for (auto* n : neurons_)
-  {
     n->forward();
-  }
 }
 
 // =============================================================
@@ -52,9 +59,7 @@ void Conv1DLayer::forward()
 void Conv1DLayer::backward()
 {
   for (auto* n : neurons_)
-  {
     n->backward();
-  }
 }
 
 // =============================================================
@@ -69,16 +74,13 @@ void Conv1DLayer::backward()
 // =============================================================
 void Conv1DLayer::step(double lr, int t)
 {
-  // Each output neuron contributes to the same filter weights.
-  // We must average the gradients across all output neurons.
-  int numContributions = size();   // number of output neurons
-
+  // Update biases for all output neurons
   for (auto* n : neurons_)
   {
-    n->step(lr, t);     // updates bias only (conv conns skipped)
+    n->step(lr, t);   // conv weights are skipped in Neuron::step()
   }
 
-  // Update shared filter weights with averaged gradient
+  // Update shared filter weights (one update per filter)
   int contribPerFilter = (int)neurons_.size() / numFilters_;
   for (auto* f : filters_)
   {
@@ -102,9 +104,9 @@ void Conv1DLayer::zero_grad()
   {
     n->zero_grad();
   }
-  for (int i = 0; i < numFilters_; i++)
+
+  for (auto* f : filters_)
   {
-    filters_.at(i)->zero_grad();   // clear accumulated gradients in filter
+    f->zero_grad();
   }
-  
 }

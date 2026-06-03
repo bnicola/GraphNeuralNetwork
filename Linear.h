@@ -16,6 +16,7 @@ class Linear : public Layer
 {
 public:
     Linear(int index, int numNeurons, Activation act);
+    Linear(int idx, int height, int width, int channels, Activation a);
 
     void forward()              override;
     void backward()             override;

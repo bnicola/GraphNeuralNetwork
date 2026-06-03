@@ -6,6 +6,10 @@ Dropout::Dropout(int idx, int n, double rate, std::mt19937& rng)
   rate_(rate), mask_(n, 1.0), rng_(rng)
 {
   createNeurons(n, "L"+std::to_string(idx)+"-D");
+
+  height_ = 1;
+  width_ = n;
+  channels_ = 1;
 }
 
 // =============================================================

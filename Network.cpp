@@ -31,6 +31,17 @@ void Network::addLinear(int n, Activation act)
   }
 }
 
+void Network::addLinear(int height, int width, int channels, Activation act)
+{
+  int    idx = (int)layers_.size();
+  auto* layer = new Linear(idx, height, width, channels, act);
+  layers_.push_back(layer);
+
+  if (layers_.size() > 1)
+  {
+    wireDense(layers_[layers_.size() - 2], layer);
+  }
+}
 // =============================================================
 //  addDropout
 //  Creates a dropout layer with pass-through connections
@@ -126,15 +137,14 @@ void Network::addSoftmax()
 // =============================================================
 void Network::addConv1D(int kernelSize, Activation act, int stride, int numFilters)
 {
-  assert(!layers_.empty() && "add an input layer first");
-  int    idx = (int)layers_.size();
-  int    prevSize = layers_.back()->size();
-  double initStd = std::sqrt(1.0 / kernelSize);
+  assert(!layers_.empty());
+  Layer* prev = layers_.back();
+  int idx = (int)layers_.size();
+  double initStd = std::sqrt(1.0 / (kernelSize * prev->channels()));
 
-  auto* layer = new Conv1DLayer(idx, prevSize, kernelSize, stride, numFilters, act, initStd);
+  auto* layer = new Conv1DLayer(idx, prev, kernelSize, stride, numFilters, act, initStd);
   layers_.push_back(layer);
-
-  wireConv1D(layers_[layers_.size() - 2], layer, numFilters);
+  wireConv1D(prev, layer, numFilters);
 }
 
 // =============================================================
@@ -160,33 +170,43 @@ void Network::addConv1D(int kernelSize, Activation act, int stride, int numFilte
 // =============================================================
 void Network::wireConv1D(Layer* prev, Conv1DLayer* curr, int numFilters)
 {
-  int K = curr->kernelSize();
-  // curr->size() gives the total number of neueons.
-  int outputSize = curr->size() / numFilters;
-  for (int f = 0; f < numFilters; f++)
+  int K          = curr->kernelSize();
+  int stride     = curr->stride();
+  int inChannels = prev->channels();
+  int inSize     = prev->width();        // Important: use shape info
+
+  int outSize    = curr->width();        // should be pre-computed in Conv1DLayer
+
+  for (int f = 0; f < numFilters; f++)   // output channels
   {
-    for (int i = 0; i < (outputSize); i++)
+    for (int o = 0; o < outSize; o++)  // output positions
     {
-      Neuron* dst = curr->neurons_[f * outputSize + i];
+      int dstIdx = (f * outSize) + o;
+      Neuron* dst = curr->neurons_[dstIdx];
 
-      int stride = curr->stride();
-      for (int k = 0; k < K; k++)
+      for (int ic = 0; ic < inChannels; ic++)   // input channels
       {
-        // input neuron at position i+k feeds into output neuron i
-        Neuron* src = prev->neurons_[(i * stride) + k];
+        for (int k = 0; k < K; k++)             // kernel positions
+        {
+          int srcPos = (o * stride) + k;
+          if (srcPos >= inSize) continue;
 
-        auto* c = new Connection();
-        c->from = src;
-        c->to = dst;
-        c->filter = curr->filters_[f];   // shared filters
-        c->filterSlot = k;               // which weight slot
-        c->trainable = true;
-        // c->weight not used — weight lives in filter
-        // c->gradient not used — grad goes to filter->accumulateGrad
+          int srcIdx = (ic * inSize) + srcPos;
+          Neuron* src = prev->neurons_[srcIdx];
 
-        src->outConns.push_back(c);
-        dst->inConns.push_back(c);
-        allConns_.push_back(c);
+          int filterSlot = (ic * K) + k;
+
+          auto* c = new Connection();
+          c->from = src;
+          c->to = dst;
+          c->filter = curr->filters_[f];
+          c->filterSlot = filterSlot;
+          c->trainable = true;
+
+          src->outConns.push_back(c);
+          dst->inConns.push_back(c);
+          allConns_.push_back(c);
+        }
       }
     }
   }
@@ -196,16 +216,24 @@ void Network::wireConv1D(Layer* prev, Conv1DLayer* curr, int numFilters)
 // addConv2D
 // =============================================================
 void Network::addConv2D(int inputHeight, int inputWidth,
-  int kernelHeight, int kernelWidth,
-  int strideH, int strideW,
-  int numFilters,
-  Activation act,
-  double initStd)
+                        int kernelHeight, int kernelWidth,
+                        int strideH, int strideW,
+                        int numFilters,
+                        Activation act,
+                        double initStd)
 {
   assert(!layers_.empty() && "add an input layer first");
 
-  int idx = (int)layers_.size();
-  auto* layer = new Conv2DLayer(idx, inputHeight, inputWidth, kernelHeight, kernelWidth, strideH, strideW, numFilters, act, initStd);
+  // Derive input channels from the previous layer's total neuron count.
+  // Previous layer layout: inputChannels * inputHeight * inputWidth
+  int inputChannels = layers_.back()->size() / (inputHeight * inputWidth);
+
+  int layerIndex = (int)layers_.size();
+  auto* layer = new Conv2DLayer(layerIndex, layers_.back(),
+                                kernelHeight, kernelWidth,
+                                strideH, strideW,
+                                numFilters, act, initStd);
+
   layers_.push_back(layer);
 
   wireConv2D(layers_[layers_.size() - 2], layer);
@@ -216,50 +244,65 @@ void Network::addConv2D(int inputHeight, int inputWidth,
 // =============================================================
 void Network::wireConv2D(Layer* prev, Conv2DLayer* curr)
 {
-  int inH = curr->inputHeight();
-  int inW = curr->inputWidth();
-  int kH = curr->kernelHeight();
-  int kW = curr->kernelWidth();
-  int sH = curr->strideH();
-  int sW = curr->strideW();
-  int numFilters = curr->numFilters();
-  int outH = curr->outputHeight();
-  int outW = curr->outputWidth();
+  int inputHeight = curr->inputHeight();
+  int inputWidth = curr->inputWidth();
+  int kernelHeight = curr->kernelHeight();
+  int kernelWidth = curr->kernelWidth();
+  int strideHeight = curr->strideH();
+  int strideWidth = curr->strideW();
+  int numOutputFilters = curr->numFilters();
+  int inputChannels = prev->size() / (inputHeight * inputWidth);
+  int outputHeight = curr->outputHeight();
+  int outputWidth = curr->outputWidth();
 
-  int neuronsPerFilter = outH * outW;
+  int outputNeuronsPerFilter = outputHeight * outputWidth;
 
-  for (int f = 0; f < numFilters; f++)
+  for (int outputFilter = 0; outputFilter < numOutputFilters; outputFilter++)
   {
-    for (int oh = 0; oh < outH; oh++)
+    for (int outputRow = 0; outputRow < outputHeight; outputRow++)
     {
-      for (int ow = 0; ow < outW; ow++)
+      for (int outputCol = 0; outputCol < outputWidth; outputCol++)
       {
-        int dstIdx = (f * neuronsPerFilter) + oh * outW + ow;
-        Neuron* dst = curr->neurons_[dstIdx];
+        int outputNeuronIndex = outputFilter * outputNeuronsPerFilter
+          + outputRow * outputWidth
+          + outputCol;
+        Neuron* dst = curr->neurons_[outputNeuronIndex];
 
-        for (int kh = 0; kh < kH; kh++)
+        for (int inputChannel = 0; inputChannel < inputChannels; inputChannel++)
         {
-          for (int kw = 0; kw < kW; kw++)
+          for (int kernelRow = 0; kernelRow < kernelHeight; kernelRow++)
           {
-            int srcH = oh * sH + kh;
-            int srcW = ow * sW + kw;
+            for (int kernelCol = 0; kernelCol < kernelWidth; kernelCol++)
+            {
+              int sourceRow = outputRow * strideHeight + kernelRow;
+              int sourceCol = outputCol * strideWidth + kernelCol;
 
-            if (srcH >= inH || srcW >= inW)
-              continue;
+              if (sourceRow >= inputHeight || sourceCol >= inputWidth)
+                continue;
 
-            int srcIdx = srcH * inW + srcW;
-            Neuron* src = prev->neurons_[srcIdx];
+              // Source neuron: channel inputChannel, pixel (sourceRow, sourceCol)
+              int sourceNeuronIndex = inputChannel * (inputHeight * inputWidth)
+                + sourceRow * inputWidth
+                + sourceCol;
+              Neuron* src = prev->neurons_[sourceNeuronIndex];
 
-            auto* c = new Connection();
-            c->from = src;
-            c->to = dst;
-            c->filter = curr->filters_[f];
-            c->filterSlot = kh * kW + kw;
-            c->trainable = true;
+              // Filter slot encodes both the input channel and kernel position.
+              // Fixed:    (inputChannel * kH * kW) + kh * kW + kw
+              int filterSlot = inputChannel * (kernelHeight * kernelWidth)
+                + kernelRow * kernelWidth
+                + kernelCol;
 
-            src->outConns.push_back(c);
-            dst->inConns.push_back(c);
-            allConns_.push_back(c);
+              auto* c = new Connection();
+              c->from = src;
+              c->to = dst;
+              c->filter = curr->filters_[outputFilter];
+              c->filterSlot = filterSlot;
+              c->trainable = true;
+
+              src->outConns.push_back(c);
+              dst->inConns.push_back(c);
+              allConns_.push_back(c);
+            }
           }
         }
       }
@@ -306,15 +349,18 @@ void Network::addMaxPool2D(int inputH, int inputW, int numChannels,
 //  neurons directly via prevLayer_ pointer.
 //  User provides input dimensions explicitly.
 // =============================================================
-void Network::addMaxPool1D(int inputSize, int numChannels, int poolSize, int stride)
+void Network::addMaxPool1D(int poolSize, int stride)
 {
   assert(!layers_.empty() && "add an input layer first");
-  assert(layers_.back()->size() == numChannels * inputSize
-    && "addMaxPool1D: previous layer size does not match dimensions");
 
   int   idx = (int)layers_.size();
+  Layer* prev = layers_.back();
+  int inputSize = prev->width();
+  int numChannels = prev->channels();
   auto* layer = new MaxPool1DLayer(idx, inputSize, numChannels, poolSize, stride);
 
+  assert(prev->size() == numChannels * inputSize
+    && "addMaxPool1D: previous layer size does not match dimensions");
   // give MaxPool direct access to previous layer neurons
   layer->setPrevLayer(layers_.back());
 

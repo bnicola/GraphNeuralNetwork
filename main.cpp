@@ -9,42 +9,47 @@ int Conv1DExample()
 
   Network net(42);
 
-  net.addLinear(7,   Activation::LINEAR); // input
-  net.addLinear(120, Activation::LEAKY_RELU);   
+  // New shape-aware way
+  net.addLinear(7, Activation::LINEAR);           // input: 7 features (flattened)
+  net.addLinear(120, Activation::LEAKY_RELU);
   net.addDropout(0.3);
-  net.addResidual(7, Activation::RELU, 0);
-  net.addConv1D(3,   Activation::LEAKY_RELU, 1, 25);
-  net.addMaxPool1D(5, 25, 2, 1);
-  net.addResidual(7, Activation::TANH, 3);
-  net.addDropout(0.3);
-  net.addLinear(2,   Activation::LINEAR);
+  //net.addResidual(7, Activation::RELU, 0);
+
+  // New simplified Conv1D - no need to pass input size!
+  net.addConv1D(3, Activation::LEAKY_RELU, 1, 25);
+
+  // New simplified MaxPool1D
+  net.addMaxPool1D(2, 1);   // poolSize=2, stride=1
+
+  net.addResidual(7, Activation::TANH, 0);
+  //net.addDropout(0.3);
+  net.addLinear(2, Activation::LINEAR);
   net.addSoftmax();
 
   net.summary();
 
-  // Test data: left-heavy vs right-heavy patterns
+  // Test data
   std::vector<std::vector<double>> X = {
-      {1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0},   // Left  → 1
-      {0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0},   // Right → 0
-      {1.0, 0.8, 0.6, 0.0, 0.0, 0.0, 0.0},   // Left  → 1
-      {0.0, 0.0, 0.0, 0.0, 0.6, 0.8, 1.0}    // Right → 0
+      {1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0},
+      {0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0},
+      {1.0, 0.8, 0.6, 0.0, 0.0, 0.0, 0.0},
+      {0.0, 0.0, 0.0, 0.0, 0.6, 0.8, 1.0}
   };
 
   std::vector<std::vector<double>> Y = { {1, 0}, {0, 1}, {1, 0}, {0, 1} };
 
   std::cout << "Training Conv1D...\n";
-  for (int epoch = 0; epoch < 2000; ++epoch)
+  for (int epoch = 0; epoch < 1000; ++epoch)   // reduced for faster testing
   {
     double loss = 0.0;
     for (size_t i = 0; i < X.size(); ++i)
     {
-      loss += net.train(X[i], Y[i], 0.0001);
+      loss += net.train(X[i], Y[i], 0.0005);
     }
     if (epoch % 200 == 0)
     {
       std::cout << "Epoch " << epoch << " - Loss: "
-        << std::setprecision(8) << loss / 4.0 << "\n";
-      net.save("Conv.model");
+        << std::setprecision(6) << loss / 4.0 << "\n";
     }
   }
 
@@ -52,10 +57,9 @@ int Conv1DExample()
   for (size_t i = 0; i < X.size(); ++i)
   {
     auto pred = net.predict(X[i]);
-    std::cout << "Input " << i << " -> " << std::fixed << std::setprecision(4)
-      << pred[0] << ", " << pred[1] << " (target = " << Y[i][0] << ", " << Y[i][1] << ")\n";
+    std::cout << "Input " << i << " -> " << pred[0] << ", " << pred[1]
+      << " (target = " << Y[i][0] << ", " << Y[i][1] << ")\n";
   }
-
   return 0;
 }
 
@@ -95,8 +99,7 @@ int Conv2DExample()
   auto pred = net.predict(input);
   for (size_t i = 0; i < pred.size(); ++i)
   {
-    std::cout << "  Class " << i << ": "
-      << std::fixed << std::setprecision(2) << pred[i] << "\n";
+    std::cout << "  Class " << i << ": " << pred[i] << "\n";
   }
 
   return 0;
@@ -105,6 +108,6 @@ int Conv2DExample()
 int main()
 {
   Conv1DExample();
-  Conv2DExample();
+  //Conv2DExample();
   return 0;
 }

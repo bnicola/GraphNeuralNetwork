@@ -78,14 +78,16 @@ void Network::addDropout(double p)
 //
 //  The skip source layer must have the same size as this layer.
 // =============================================================
-void Network::addResidual(int n, Activation act, int skipFromIdx)
+void Network::addResidual(int skipFromIdx, Activation act)
 {
   assert(!layers_.empty() && "add an input layer first");
   assert(skipFromIdx >= 0 && skipFromIdx < (int)layers_.size() && "skipFromIdx out of range");
-  assert(layers_[skipFromIdx]->size() == n && "Residual layer size must match skip source layer size");
+ 
+  Layer* skip = layers_[skipFromIdx];
+  int skippedLayerNumNeurons = skip->size();
 
   int   idx   = (int)layers_.size();
-  auto* layer = new Residual(idx, n, act, skipFromIdx);
+  auto* layer = new Residual(idx, skippedLayerNumNeurons, act, skipFromIdx);
   layers_.push_back(layer);
 
   // path 1 — dense from previous layer
@@ -215,8 +217,7 @@ void Network::wireConv1D(Layer* prev, Conv1DLayer* curr, int numFilters)
 // =============================================================
 // addConv2D
 // =============================================================
-void Network::addConv2D(int inputHeight, int inputWidth,
-                        int kernelHeight, int kernelWidth,
+void Network::addConv2D(int kernelHeight, int kernelWidth,
                         int strideH, int strideW,
                         int numFilters,
                         Activation act,
@@ -224,11 +225,13 @@ void Network::addConv2D(int inputHeight, int inputWidth,
 {
   assert(!layers_.empty() && "add an input layer first");
 
-  // Derive input channels from the previous layer's total neuron count.
-  // Previous layer layout: inputChannels * inputHeight * inputWidth
-  int inputChannels = layers_.back()->size() / (inputHeight * inputWidth);
+  Layer* prev          = layers_.back();
+  int    inputHeight   = prev->height();
+  int    inputWidth    = prev->width();
+  int    inputChannels = prev->channels();
 
-  int layerIndex = (int)layers_.size();
+  int    layerIndex    = (int)layers_.size();
+
   auto* layer = new Conv2DLayer(layerIndex, layers_.back(),
                                 kernelHeight, kernelWidth,
                                 strideH, strideW,
@@ -316,17 +319,23 @@ void Network::wireConv2D(Layer* prev, Conv2DLayer* curr)
 //  neurons directly via prevLayer_ pointer.
 //  User provides input dimensions explicitly.
 // =============================================================
-void Network::addMaxPool2D(int inputH, int inputW, int numChannels,             
-                           int poolH, int poolW,
+void Network::addMaxPool2D(int poolH, int poolW,
                            int strideH, int strideW)
 {
   assert(!layers_.empty() && "add an input layer first");
-  assert(layers_.back()->size() == numChannels * inputH * inputW
+
+  Layer* prev        = layers_.back();
+  int    inputHeight = prev->height();
+  int    inputWidth  = prev->width();
+  int    numChannels = prev->channels();
+
+  assert(layers_.back()->size() == numChannels * inputHeight * inputWidth
     && "addMaxPool2D: previous layer size does not match dimensions");
 
   int   idx = (int)layers_.size();
   auto* layer = new MaxPool2DLayer(idx,
-                                   inputH, inputW, numChannels,
+                                   inputHeight, inputWidth,
+                                   numChannels,
                                    poolH, poolW,
                                    strideH, strideW);
 
@@ -1023,7 +1032,7 @@ bool Network::load(const std::string& filename)
 
       ss >> size >> act >> skipIdx;
 
-      addResidual(size, parseAct(act), skipIdx);
+      addResidual(skipIdx, parseAct(act));
     }
     else if (type == "Conv1D")
     {
@@ -1065,7 +1074,7 @@ bool Network::load(const std::string& filename)
         >> numFilters
         >> act;
 
-      addConv2D(inputH, inputW, kernelH, kernelW, strideH, strideW, numFilters, parseAct(act), std::sqrt(1.0 / (kernelH * kernelW)));
+      addConv2D(kernelH, kernelW, strideH, strideW, numFilters, parseAct(act), std::sqrt(1.0 / (kernelH * kernelW)));
     }
     else if (type == "MaxPool2D")
     {
@@ -1087,7 +1096,7 @@ bool Network::load(const std::string& filename)
         >> strideH
         >> strideW;
 
-      addMaxPool2D(inputH, inputW, numCh, poolH, poolW, strideH, strideW);
+      addMaxPool2D(numCh, poolH, poolW, strideH);
     }
     else if (type == "Softmax")
     {

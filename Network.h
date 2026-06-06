@@ -7,6 +7,7 @@
 #include "Conv2d.h"
 #include "Maxpool2D.h"
 #include "LayerNorm.h"
+#include "Embedding.h"
 #include "Softmax.h"
 #include <vector>
 #include <random>
@@ -51,6 +52,7 @@ public:
     void addMaxPool1D(int poolSize, int stride);
     void addConv2D   (int kernelHeight, int kernelWidth, int strideH, int strideW, int numFilters, Activation act, double initStd);
     void addMaxPool2D(int poolH, int poolW, int strideH, int strideW);
+    void addEmbedding(int seqLength, int vocabSize, int embeddingDim);
     void addLayerNorm(double epsilon);
     void addSoftmax();
 

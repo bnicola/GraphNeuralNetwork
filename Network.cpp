@@ -410,6 +410,33 @@ void Network::addLayerNorm(double epsilon)
 }
 
 // =============================================================
+//  addEmbedding
+//
+//  Creates an Embedding layer as the first real layer in the
+//  network.  The previous layer (layers_[0]) is the raw input
+//  layer whose neuron outputs hold integer token IDs.
+//
+//  The Embedding layer is NOT wired with wireDense — it reads
+//  prev_->neurons_ directly inside its own forward(), so no
+//  Connection objects are created here.
+//
+//  After this call the network shape is:
+//    layers_[0]  : input  (seqLength neurons, one per token position)
+//    layers_[1]  : Embedding (seqLength * embeddingDim neurons)
+// =============================================================
+void Network::addEmbedding(int seqLength, int vocabSize, int embeddingDim)
+{
+  assert(!layers_.empty() && "Add an input layer (addLinear) first");
+  assert((int)layers_.back()->size() == seqLength && "Input layer size must equal seqLength");
+
+  int    idx = (int)layers_.size();
+  Layer* prev = layers_.back();
+  auto* layer = new Embedding(idx, seqLength, vocabSize, embeddingDim, prev);
+  layers_.push_back(layer);
+  // No Connection wiring needed — Embedding reads prev_ directly.
+}
+
+// =============================================================
 //  forward
 //  Propagates inputs left to right through all layers.
 //  Dropout uses forwardWithMask(); all others use forward().

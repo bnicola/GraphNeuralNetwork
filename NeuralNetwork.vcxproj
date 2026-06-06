@@ -25,6 +25,7 @@
     <ClCompile Include="Conv1d.cpp" />
     <ClCompile Include="Conv2d.cpp" />
     <ClCompile Include="Dropout.cpp" />
+    <ClCompile Include="Embedding.cpp" />
     <ClCompile Include="Filter.cpp" />
     <ClCompile Include="Layer.cpp" />
     <ClCompile Include="LayerNorm.cpp" />
@@ -44,6 +45,7 @@
     <ClInclude Include="Conv1d.h" />
     <ClInclude Include="Conv2d.h" />
     <ClInclude Include="Dropout.h" />
+    <ClInclude Include="Embedding.h" />
     <ClInclude Include="Filter.h" />
     <ClInclude Include="Layer.h" />
     <ClInclude Include="LayerNorm.h" />

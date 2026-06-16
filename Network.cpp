@@ -436,6 +436,73 @@ void Network::addEmbedding(int seqLength, int vocabSize, int embeddingDim)
   // No Connection wiring needed — Embedding reads prev_ directly.
 }
 
+void Network::addAttention(int outputChannels, Activation act)
+{
+  assert(!layers_.empty() && "Add an input/embedding layer first");
+  Layer* prev = layers_.back();
+  int idx = (int)layers_.size();
+
+  // Scale initialization standard deviation using your framework's conv convention
+  double initStd = std::sqrt(1.0 / prev->channels());
+
+  auto* layer = new AttentionLayer(idx, prev, outputChannels, act, initStd);
+  layers_.push_back(layer);
+
+  // Execute multi-projection spatial mapping logic
+  wireAttention(prev, layer, outputChannels);
+}
+
+void Network::wireAttention(Layer* prev, AttentionLayer* curr, int outputChannels)
+{
+  int seqLen = curr->width();         // X-Axis (Sequence Length)
+  int inChannels = prev->channels();  // Z-Axis (Input Channels depth)
+  int projSize = outputChannels * seqLen; // Footprint of a single projection block
+
+  // 1. Loop through sequence timeline items (X-Axis)
+  for (int t = 0; t < seqLen; t++)
+  {
+    // 2. Loop through target projected features (Y-Axis)
+    for (int outC = 0; outC < outputChannels; outC++)
+    {
+      // Base local projection flat channel index mapping: (Channel * Length) + Step
+      int localDstIdx = (outC * seqLen) + t;
+
+      // Resolve target pointer slots across all 3 structural groups
+      Neuron* qDst = curr->neurons_[localDstIdx];
+      Neuron* kDst = curr->neurons_[localDstIdx + (1 * projSize)]; // Offset past Q block
+      Neuron* vDst = curr->neurons_[localDstIdx + (2 * projSize)]; // Offset past Q & K blocks
+
+      // 3. Drill deep into the page along the input embedding dimension (Z-Axis)
+      for (int inC = 0; inC < inChannels; inC++)
+      {
+        int srcIdx = (inC * seqLen) + t;
+        Neuron* src = prev->neurons_[srcIdx];
+
+        // Create Connection for Query Projection (Q)
+        auto* cQ = new Connection();
+        cQ->from = src; cQ->to = qDst; cQ->trainable = true;
+        cQ->filter = curr->qFilters_[outC];
+        cQ->filterSlot = inC;
+        src->outConns.push_back(cQ); qDst->inConns.push_back(cQ); allConns_.push_back(cQ);
+
+        // Create Connection for Key Projection (K)
+        auto* cK = new Connection();
+        cK->from = src; cK->to = kDst; cK->trainable = true;
+        cK->filter = curr->kFilters_[outC];
+        cK->filterSlot = inC;
+        src->outConns.push_back(cK); kDst->inConns.push_back(cK); allConns_.push_back(cK);
+
+        // Create Connection for Value Projection (V)
+        auto* cV = new Connection();
+        cV->from = src; cV->to = vDst; cV->trainable = true;
+        cV->filter = curr->vFilters_[outC];
+        cV->filterSlot = inC;
+        src->outConns.push_back(cV); vDst->inConns.push_back(cV); allConns_.push_back(cV);
+      }
+    }
+  }
+}
+
 // =============================================================
 //  forward
 //  Propagates inputs left to right through all layers.
@@ -722,7 +789,6 @@ double Network::xavier(int fanIn, int fanOut) const
 {
   return std::sqrt(2.0 / (fanIn + fanOut));
 }
-
 
 // =============================================================
 //  Network::save()

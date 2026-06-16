@@ -21,6 +21,8 @@
   <ItemGroup>
     <ClCompile Include="Activation.cpp" />
     <ClCompile Include="Adam.cpp" />
+    <ClCompile Include="Attention.cpp" />
+    <ClCompile Include="AttentionScore.cpp" />
     <ClCompile Include="Connection.cpp" />
     <ClCompile Include="Conv1d.cpp" />
     <ClCompile Include="Conv2d.cpp" />
@@ -41,6 +43,8 @@
   <ItemGroup>
     <ClInclude Include="Activation.h" />
     <ClInclude Include="Adam.h" />
+    <ClInclude Include="Attention.h" />
+    <ClInclude Include="AttentionScore.h" />
     <ClInclude Include="Connection.h" />
     <ClInclude Include="Conv1d.h" />
     <ClInclude Include="Conv2d.h" />

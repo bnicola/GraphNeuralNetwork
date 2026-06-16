@@ -9,6 +9,7 @@
 #include "LayerNorm.h"
 #include "Embedding.h"
 #include "Softmax.h"
+#include "Attention.h"
 #include <vector>
 #include <random>
 #include <map>
@@ -54,6 +55,7 @@ public:
     void addMaxPool2D(int poolH, int poolW, int strideH, int strideW);
     void addEmbedding(int seqLength, int vocabSize, int embeddingDim);
     void addLayerNorm(double epsilon);
+    void addAttention(int outputChannels, Activation act);
     void addSoftmax();
 
     // ── PyTorch-style interface ───────────────────────────
@@ -91,6 +93,7 @@ private:
     void wireSkip    (Layer* src,  Layer* dst);
     void wireConv1D  (Layer* prev, Conv1DLayer* curr, int numFilters);
     void wireConv2D(Layer* prev, Conv2DLayer* curr);
+    void wireAttention(Layer* prev, AttentionLayer* curr, int outputChannels);
 
     std::vector<double> getOutputs() const;
     double              xavier     (int fanIn, int fanOut) const;

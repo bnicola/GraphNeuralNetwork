@@ -22,7 +22,7 @@
 //  We use helper functions qNeuron(t,z), kNeuron(t,z), vNeuron(t,z)
 //  to access the right neuron for token t, dim z.
 //
-//  Topology (your coordinate system):
+//  Topology (coordinate system):
 //    X-axis = token positions  (seqLen)
 //    Z-axis = outputChannels   (going into page)
 //

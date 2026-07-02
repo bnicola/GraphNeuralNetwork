@@ -51,7 +51,7 @@ public:
     void addResidual (int skipFromIdx, Activation act);
     void addConv1D   (int kernelSize, Activation act, int stride = 1, int numFilters = 1);
     void addMaxPool1D(int poolSize, int stride);
-    void addConv2D   (int kernelHeight, int kernelWidth, int strideH, int strideW, int numFilters, Activation act, double initStd);
+    void addConv2D   (int kernelHeight, int kernelWidth, int strideH, int strideW, int numFilters, Activation act, double initStd = 0.3);
     void addMaxPool2D(int poolH, int poolW, int strideH, int strideW);
     void addEmbedding(int seqLength, int vocabSize, int embeddingDim);
     void addLayerNorm(double epsilon);
@@ -59,6 +59,7 @@ public:
     void addSoftmax();
 
     // ── PyTorch-style interface ───────────────────────────
+    void SetTraining(bool trainig);
     std::vector<double> forward  (const std::vector<double>& inputs,
                                   bool isTraining = true);
     double              backward (const std::vector<double>& targets, int batchSize = 1);

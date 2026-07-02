@@ -18,6 +18,7 @@ public:
   virtual std::string typeName() const = 0;
   virtual int skipFrom() const { return -1; }
 
+  virtual void setTraining(bool training) { training_ = training; }
   int size() const { return (int)neurons_.size(); }
 
   // ==================== SHAPE SYSTEM ====================
@@ -28,12 +29,16 @@ public:
   int index;
   Activation act;
   std::vector<Neuron*> neurons_;
-
-protected:
-  void createNeurons(int n, const std::string& prefix);
-
+public:
   // Shape members (protected so derived classes can set them)
   int channels_ = 1;
   int height_ = 1;
   int width_ = 1;   // For flattened layers: width = total neurons
+
+
+protected:
+  void createNeurons(int n, const std::string& prefix);
+
+ 
+  bool training_{ false };
 };

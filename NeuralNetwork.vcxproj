@@ -56,6 +56,7 @@
     <ClInclude Include="Linear.h" />
     <ClInclude Include="Maxpool1D.h" />
     <ClInclude Include="Maxpool2D.h" />
+    <ClInclude Include="MicroOp.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="Neuron.h" />
     <ClInclude Include="Residual.h" />

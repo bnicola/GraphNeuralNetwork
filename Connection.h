@@ -40,6 +40,7 @@ public:
     Neuron*   to;
     double    weight;      // used only if filter == nullptr
     double    gradient;    // used only if filter == nullptr
+    double    sensitivity;
     bool      trainable;   // false = fixed weight (skip), never updated
     Filter*   filter;      // nullptr = normal, non-null = conv
     int       filterSlot;  // which slot in the filter (-1 if not conv)

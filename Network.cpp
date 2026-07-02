@@ -1,5 +1,8 @@
 #include "Network.h"
-
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
 
 // =============================================================
 //  Constructor / Destructor
@@ -53,7 +56,7 @@ void Network::addDropout(double p)
 
   int    idx   = (int)layers_.size();
   int    n     = layers_.back()->size();
-  auto*  layer = new Dropout(idx, n, p, rng_);
+  auto*  layer = new Dropout(idx, n, p, layers_.back(), rng_);
   layers_.push_back(layer);
 
   // one-to-one pass-through connections from previous layer
@@ -503,6 +506,15 @@ void Network::wireAttention(Layer* prev, AttentionLayer* curr, int outputChannel
   }
 }
 
+void Network::SetTraining(bool trainig)
+{
+  for (int i = 0; i < layers_.size(); i++)
+  {
+    layers_[i]->setTraining(trainig);
+  }
+}
+
+
 // =============================================================
 //  forward
 //  Propagates inputs left to right through all layers.
@@ -513,32 +525,19 @@ std::vector<double> Network::forward(const std::vector<double>& inputs, bool isT
   assert(!layers_.empty());
   assert((int)inputs.size() == layers_[0]->size());
 
-  // set input layer values
   for (int i = 0; i < (int)inputs.size(); i++)
   {
     layers_[0]->neurons_[i]->output = inputs[i];
   }
 
-  // propagate left to right
-  for (int i = 1; i < (int)layers_.size(); i++)  
+  for (int i = 1; i < (int)layers_.size(); i++)
   {
-    if (auto* dl = dynamic_cast<Dropout*>(layers_[i])) 
-    {
-      std::vector<double> prev;
-      for (auto* n : layers_[i - 1]->neurons_)
-      {
-        prev.push_back(n->output);
-      }
-      dl->forwardWithMask(prev, isTraining);
-    }
-    else
-    {
-      layers_[i]->forward();
-    }
+    layers_[i]->forward();
   }
-  
+
   return getOutputs();
 }
+
 
 // =============================================================
 //  backward
@@ -920,7 +919,13 @@ bool Network::save(const std::string& filename) const
     }
     else   // Linear (default)
     {
-      f << "Linear " << l->size() << " " << actName(l->act) << "\n";
+      // save height, width, channels so input layers with spatial
+      // dimensions (e.g. addLinear(32, 32, 3, ...)) are restored correctly
+      f << "Linear " << l->size()
+        << " " << l->height()
+        << " " << l->width()
+        << " " << l->channels()
+        << " " << actName(l->act) << "\n";
     }
   }
 
@@ -1087,24 +1092,25 @@ bool Network::load(const std::string& filename)
     if (type == "Linear")
     {
       int size;
+      int height;
+      int width;
+      int channels;
       std::string act;
 
-      ss >> size >> act;
+      ss >> size >> height >> width >> channels >> act;
 
-      // -----------------------------------
-      // first layer = input layer
-      // no dense wiring should occur
-      // -----------------------------------
       if (layers_.empty())
       {
+        // reconstruct input layer with correct spatial dimensions
         int idx = (int)layers_.size();
 
-        Layer* layer = new Linear(idx, size, parseAct(act));
-
+        Linear* layer = new Linear(idx, height, width, channels, parseAct(act));
         layers_.push_back(layer);
       }
       else
       {
+        // hidden/output linear layers — spatial dims are always 1x1xN
+        // but save them consistently anyway
         addLinear(size, parseAct(act));
       }
     }
@@ -1166,7 +1172,7 @@ bool Network::load(const std::string& filename)
         >> strideW
         >> numFilters
         >> act;
-
+      
       addConv2D(kernelH, kernelW, strideH, strideW, numFilters, parseAct(act), std::sqrt(1.0 / (kernelH * kernelW)));
     }
     else if (type == "MaxPool2D")
@@ -1189,7 +1195,8 @@ bool Network::load(const std::string& filename)
         >> strideH
         >> strideW;
 
-      addMaxPool2D(numCh, poolH, poolW, strideH);
+      //addMaxPool2D(numCh, poolH, poolW, strideH);
+      addMaxPool2D(poolH, poolW, strideH, strideW);
     }
     else if (type == "Softmax")
     {

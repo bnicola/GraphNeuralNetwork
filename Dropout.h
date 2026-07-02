@@ -29,7 +29,7 @@
 class Dropout : public Layer
 {
 public:
-    Dropout(int index, int numNeurons, double rate, std::mt19937& rng);
+    Dropout(int index, int numNeurons, double rate, Layer* prev, std::mt19937& rng);
 
     // called by Network::forward() instead of forward()
     void forwardWithMask(const std::vector<double>& prevOutputs,
@@ -41,11 +41,14 @@ public:
     void zero_grad()            override;
 
     std::string typeName() const override { return "Dropout"; }
-
+    void setTraining(bool t) { isTraining_ = t; }
     double rate() const { return rate_; }
 
 private:
     double              rate_;
     std::vector<double> mask_;
     std::mt19937&       rng_;
+
+    Layer*              prevLayer_;
+    bool                isTraining_;
 };

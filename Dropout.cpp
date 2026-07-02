@@ -1,15 +1,27 @@
 #include "Dropout.h"
 #include "Filter.h"
 
-Dropout::Dropout(int idx, int n, double rate, std::mt19937& rng)
+Dropout::Dropout(int idx, int n, double rate, Layer* prev, std::mt19937& rng)
   : Layer(idx, Activation::LINEAR),
-  rate_(rate), mask_(n, 1.0), rng_(rng)
+  rate_(rate), mask_(n, 1.0), rng_(rng), prevLayer_(prev), isTraining_(false)
 {
   createNeurons(n, "L"+std::to_string(idx)+"-D");
 
   height_ = 1;
   width_ = n;
   channels_ = 1;
+}
+
+void Dropout::forward()
+{
+  // collect previous layer outputs
+  std::vector<double> prev;
+  prev.reserve(prevLayer_->size());
+  for (auto* n : prevLayer_->neurons_)
+    prev.push_back(n->output);
+
+  // run the real forward using stored training flag
+  forwardWithMask(prev, isTraining_);
 }
 
 // =============================================================
@@ -21,23 +33,24 @@ void Dropout::forwardWithMask(const std::vector<double>& prev, bool isTraining)
 {
   std::uniform_real_distribution<double> dist(0.0, 1.0);
 
-  for (int i = 0; i < (int)neurons_.size(); i++) 
+  for (int i = 0; i < (int)neurons_.size(); i++)
   {
-    if (isTraining) 
+    if (isTraining)
     {
       // regenerate mask every forward pass
       mask_[i] = (dist(rng_) > rate_) ? 1.0 : 0.0;
       // scale kept neurons so expected value is unchanged
-      
+
       neurons_[i]->output = prev[i] * mask_[i] / (1.0 - rate_);
     }
-    else 
+    else
     {
       // no dropout at inference — all neurons active
       neurons_[i]->output = prev[i];
     }
   }
 }
+
 
 // =============================================================
 //  backward
@@ -62,10 +75,6 @@ void Dropout::backward()
   }
 }
 
-void Dropout::forward()
-{
-  // no-op — use forwardWithMask()
-}   
 void Dropout::step(double, int)
 {
   // no weights to update
